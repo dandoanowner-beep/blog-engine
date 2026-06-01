@@ -1,0 +1,316 @@
+name: Blog Engine CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  GO_VERSION: "1.25"
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/blog-engine-api
+
+jobs:
+  # ── Job 1: Test ───────────────────────────────────────────────────────────────
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: blog
+          POSTGRES_PASSWORD: blog
+          POSTGRES_DB: blog_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Download dependencies
+        working-directory: ./code
+        run: go mod download
+
+      - name: Build binary (verify compilation)
+        working-directory: ./code
+        run: go build ./cmd/server
+
+      - name: Run tests with coverage
+        working-directory: ./code
+        run: go test ./... -coverprofile=coverage.out -covermode=atomic
+        env:
+          DATABASE_URL: postgres://blog:blog@localhost:5432/blog_test?sslmode=disable
+          JWT_SECRET: ci-test-secret-min-32-chars-long!!
+          JWT_REFRESH_SECRET: ci-test-refresh-secret-min-32-chars!
+          R2_ACCOUNT_ID: test
+          R2_ACCESS_KEY_ID: test
+          R2_SECRET_ACCESS_KEY: test
+          R2_BUCKET_NAME: test
+          R2_PUBLIC_URL: https://test.r2.dev
+
+      - name: Check coverage gate (80% minimum)
+        working-directory: ./code
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          echo "Total coverage: ${COVERAGE}%"
+          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+            echo "FAIL: Coverage ${COVERAGE}% is below 80% minimum"
+            exit 1
+          fi
+          echo "PASS: Coverage ${COVERAGE}% meets 80% minimum"
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: ./code/coverage.out
+
+  # ── Job 2: Build ──────────────────────────────────────────────────────────────
+  build:
+    name: Build & Push Image
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=sprint1-
+            type=raw,value=latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # ── Job 3: Deploy ─────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
+
+      - name: Terraform Init
+        working-directory: ./iac
+        run: terraform init
+        env:
+          TF_VAR_db_url: ${{ secrets.DATABASE_URL }}
+
+      - name: Terraform Plan
+        working-directory: ./iac
+        run: terraform plan -out=tfplan
+        env:
+          TF_VAR_db_url: ${{ secrets.DATABASE_URL }}
+          TF_VAR_image_tag: sprint1-${{ github.sha }}
+
+      - name: Terraform Apply
+        working-directory: ./iac
+        run: terraform apply -auto-approve tfplan
+        env:
+          TF_VAR_db_url: ${{ secrets.DATABASE_URL }}
+          TF_VAR_image_tag: sprint1-${{ github.sha }}
+
+      - name: Run database migrations
+        run: |
+          docker run --rm \
+            -e DATABASE_URL=${{ secrets.DATABASE_URL }} \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sprint1-${{ github.sha }} \
+            /app/blog-engine migrate
+
+      - name: Health check
+        run: |
+          sleep 15
+          curl -f ${{ secrets.APP_URL }}/health || exit 1
+
+      - name: Tag deploy
+        run: |
+          echo "DEPLOY_TAG=sprint1-$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_ENV
+          echo "Deployed: sprint1-$(echo ${{ github.sha }} | cut -c1-7)"
+
+  # ── Job 4: Frontend Test ───────────────────────────────────────────────────────
+  frontend-test:
+    name: Frontend Test & Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Run tests with coverage
+        working-directory: ./frontend
+        run: npm run test:coverage
+
+      - name: Check coverage gate (80% minimum — lines)
+        working-directory: ./frontend
+        run: |
+          npx vitest run --coverage --reporter=json 2>/dev/null || true
+          echo "Coverage gate enforced by vitest thresholds (lines: 80)"
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage-report
+          path: frontend/coverage/
+
+  # ── Job 5: Frontend Build ──────────────────────────────────────────────────────
+  frontend-build:
+    name: Frontend Build & Push Image
+    runs-on: ubuntu-latest
+    needs: frontend-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+
+    env:
+      FRONTEND_IMAGE: ${{ github.repository }}/blog-engine-frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build Vite production bundle
+        working-directory: ./frontend
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: ${{ secrets.API_BASE_URL }}
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}
+          tags: |
+            type=sha,prefix=frontend-
+            type=raw,value=latest
+
+      - name: Build and push frontend Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile.nginx
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # ── Job 6: Frontend Deploy ─────────────────────────────────────────────────────
+  frontend-deploy:
+    name: Deploy Frontend
+    runs-on: ubuntu-latest
+    needs: [build, frontend-build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
+
+      - name: Terraform Init
+        working-directory: ./iac
+        run: terraform init
+
+      - name: Terraform Plan (frontend extension)
+        working-directory: ./iac
+        run: terraform plan -out=tfplan-frontend
+        env:
+          TF_VAR_db_url: ${{ secrets.DATABASE_URL }}
+          TF_VAR_image_tag: sprint1-${{ github.sha }}
+          TF_VAR_frontend_image_tag: frontend-${{ github.sha }}
+          TF_VAR_api_base_url: ${{ secrets.API_BASE_URL }}
+
+      - name: Terraform Apply (frontend extension)
+        working-directory: ./iac
+        run: terraform apply -auto-approve tfplan-frontend
+        env:
+          TF_VAR_db_url: ${{ secrets.DATABASE_URL }}
+          TF_VAR_image_tag: sprint1-${{ github.sha }}
+          TF_VAR_frontend_image_tag: frontend-${{ github.sha }}
+          TF_VAR_api_base_url: ${{ secrets.API_BASE_URL }}
+
+      - name: Frontend health check
+        run: |
+          sleep 15
+          curl -f ${{ secrets.APP_URL }} | grep -q "Blog Engine" || exit 1
+
+      - name: Tag frontend deploy
+        run: |
+          echo "FRONTEND_DEPLOY_TAG=frontend-$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_ENV
+          echo "Frontend deployed: frontend-$(echo ${{ github.sha }} | cut -c1-7)"

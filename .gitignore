@@ -1,0 +1,29 @@
+# Environment — never commit real credentials
+.env.local
+.env.*.local
+.env
+
+# Agent artifacts (SDLC pipeline internals)
+architect/
+ba/
+developer/
+devops/
+pm/
+qa/
+reviewer/
+context.json
+
+# Go build artifacts
+code/server.exe
+code/server
+code/*.out
+code/coverage/
+
+# Frontend build artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,53 @@
+services:
+
+  # ── Database ──────────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: blog
+      POSTGRES_PASSWORD: blogpassword
+      POSTGRES_DB: blog_engine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./code/migrations:/docker-entrypoint-initdb.d:ro   # runs once on first start
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blog -d blog_engine"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+    ports:
+      - "5432:5432"
+
+  # ── Go REST API ───────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ./code
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env.local
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ── React Frontend (nginx) ────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.nginx
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
