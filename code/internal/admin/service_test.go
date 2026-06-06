@@ -12,6 +12,8 @@ import (
 
 // --- Mock ---
 
+var _ admin.Repository = (*mockRepo)(nil)
+
 type mockRepo struct{ mock.Mock }
 
 func (m *mockRepo) ListUsers(ctx context.Context, page int, role string) ([]*admin.UserRow, int, error) {

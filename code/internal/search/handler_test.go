@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+var _ search.Repository = (*mockSearchRepo)(nil)
+
 type mockSearchRepo struct{ mock.Mock }
 
 func (m *mockSearchRepo) SearchBlogs(ctx context.Context, q string, viewerID uuid.UUID, page int) ([]*search.BlogResult, int, error) {

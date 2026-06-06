@@ -12,6 +12,8 @@ import (
 
 // --- Mock Repository ---
 
+var _ notification.Repository = (*mockRepo)(nil)
+
 type mockRepo struct{ mock.Mock }
 
 func (m *mockRepo) Create(ctx context.Context, n *notification.Notification) error {

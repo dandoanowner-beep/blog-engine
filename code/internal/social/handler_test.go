@@ -16,6 +16,8 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+var _ social.SocialService = (*mockSocialSvc)(nil)
+
 type mockSocialSvc struct{ mock.Mock }
 
 func (m *mockSocialSvc) Follow(ctx context.Context, a, b uuid.UUID) error {
@@ -88,6 +90,9 @@ func TestFollowHandler_Success(t *testing.T) {
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusCreated, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.Equal(t, "Following", resp["message"])
 }
 
 func TestFollowHandler_AlreadyFollowing_Returns409(t *testing.T) {
@@ -107,6 +112,9 @@ func TestFollowHandler_AlreadyFollowing_Returns409(t *testing.T) {
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusConflict, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotEmpty(t, resp["error"])
 }
 
 func TestUnfollowHandler_Returns204(t *testing.T) {
@@ -169,6 +177,9 @@ func TestReactHandler_InvalidType_Returns400(t *testing.T) {
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotEmpty(t, resp["error"])
 }
 
 func TestCreateCommentHandler_Success(t *testing.T) {
@@ -190,6 +201,9 @@ func TestCreateCommentHandler_Success(t *testing.T) {
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusCreated, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotEmpty(t, resp["ID"])
 }
 
 func TestReportHandler_Success(t *testing.T) {
@@ -210,6 +224,9 @@ func TestReportHandler_Success(t *testing.T) {
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusCreated, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.Equal(t, "Report submitted", resp["message"])
 }
 
 func TestReportHandler_DuplicateReport_Returns409(t *testing.T) {
@@ -230,6 +247,9 @@ func TestReportHandler_DuplicateReport_Returns409(t *testing.T) {
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusConflict, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotEmpty(t, resp["error"])
 }
 
 func TestSendFriendRequestHandler_Success(t *testing.T) {
@@ -251,6 +271,9 @@ func TestSendFriendRequestHandler_Success(t *testing.T) {
 	r.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusCreated, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotEmpty(t, resp["ID"])
 }
 
 func TestSendFriendRequestHandler_AlreadyPending_Returns409(t *testing.T) {
@@ -270,6 +293,9 @@ func TestSendFriendRequestHandler_AlreadyPending_Returns409(t *testing.T) {
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusConflict, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotEmpty(t, resp["error"])
 }
 
 func TestRespondFriendRequestHandler_Accept_Returns200(t *testing.T) {
@@ -366,6 +392,9 @@ func TestBlockUserHandler_Returns201(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.BlockUser(rec, req)
 	assert.Equal(t, http.StatusCreated, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.Equal(t, "Blocked", resp["message"])
 }
 
 func TestUnblockUserHandler_Returns204(t *testing.T) {

@@ -12,6 +12,9 @@ import (
 
 // --- Mocks ---
 
+var _ blog.Repository = (*mockRepo)(nil)
+var _ blog.Sanitizer = (*mockSanitizer)(nil)
+
 type mockRepo struct{ mock.Mock }
 
 func (m *mockRepo) Create(ctx context.Context, b *blog.Blog) error {

@@ -18,6 +18,8 @@ import (
 
 // --- mocks ---
 
+var _ notification.Repository = (*mockNotifRepo)(nil)
+
 type mockNotifRepo struct{ mock.Mock }
 
 func (m *mockNotifRepo) Create(ctx context.Context, n *notification.Notification) error {

@@ -12,6 +12,9 @@ import (
 
 // --- Mock Repository ---
 
+var _ social.Repository = (*mockRepo)(nil)
+var _ social.Notifier = (*mockNotifier)(nil)
+
 type mockRepo struct{ mock.Mock }
 
 func (m *mockRepo) Follow(ctx context.Context, followerID, followeeID uuid.UUID) error {

@@ -215,7 +215,7 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) BlockUser(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusCreated)
+	writeJSON(w, http.StatusCreated, map[string]string{"message": "Blocked"})
 }
 
 func (h *Handler) UnblockUser(w http.ResponseWriter, r *http.Request) {

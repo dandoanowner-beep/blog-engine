@@ -17,6 +17,8 @@ import (
 
 // --- mock service ---
 
+var _ auth.AuthService = (*mockAuthService)(nil)
+
 type mockAuthService struct{ mock.Mock }
 
 func (m *mockAuthService) Register(ctx context.Context, email, username, password string) (*auth.User, error) {
@@ -95,6 +97,9 @@ func TestRegisterHandler_DuplicateEmail_Returns400(t *testing.T) {
 
 	h.Register(rec, req)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotEmpty(t, resp["error"])
 }
 
 func TestRegisterHandler_InvalidJSON_Returns400(t *testing.T) {
@@ -107,6 +112,9 @@ func TestRegisterHandler_InvalidJSON_Returns400(t *testing.T) {
 
 	h.Register(rec, req)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotEmpty(t, resp["error"])
 }
 
 func TestLoginHandler_Success(t *testing.T) {
@@ -150,6 +158,9 @@ func TestLoginHandler_InvalidCredentials_Returns401(t *testing.T) {
 
 	h.Login(rec, req)
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotEmpty(t, resp["error"])
 }
 
 func TestLoginHandler_LockedAccount_Returns423(t *testing.T) {
@@ -165,6 +176,9 @@ func TestLoginHandler_LockedAccount_Returns423(t *testing.T) {
 
 	h.Login(rec, req)
 	assert.Equal(t, http.StatusLocked, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotEmpty(t, resp["error"])
 }
 
 func TestVerifyEmailHandler_Success(t *testing.T) {
@@ -178,6 +192,9 @@ func TestVerifyEmailHandler_Success(t *testing.T) {
 
 	h.VerifyEmail(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.Equal(t, "Email verified", resp["message"])
 }
 
 func TestVerifyEmailHandler_ExpiredToken_Returns400(t *testing.T) {
@@ -191,6 +208,9 @@ func TestVerifyEmailHandler_ExpiredToken_Returns400(t *testing.T) {
 
 	h.VerifyEmail(rec, req)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotEmpty(t, resp["error"])
 }
 
 func TestForgotPasswordHandler_AlwaysReturns200(t *testing.T) {
@@ -207,6 +227,9 @@ func TestForgotPasswordHandler_AlwaysReturns200(t *testing.T) {
 
 	h.ForgotPassword(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotEmpty(t, resp["message"])
 }
 
 func TestHealthHandler_Returns200(t *testing.T) {
@@ -215,6 +238,9 @@ func TestHealthHandler_Returns200(t *testing.T) {
 
 	auth.HealthHandler(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.Equal(t, "ok", resp["status"])
 }
 
 // ensure unused import doesn't break

@@ -54,6 +54,9 @@ func TestGetProfileHandler_NotFound_Returns404(t *testing.T) {
 	r.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusNotFound, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotEmpty(t, resp["error"])
 }
 
 func TestUpdateProfileHandler_Success(t *testing.T) {
@@ -80,6 +83,9 @@ func TestUpdateProfileHandler_Success(t *testing.T) {
 	r.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotNil(t, resp["user"])
 }
 
 func TestUpdateProfileHandler_DuplicateUsername_Returns409(t *testing.T) {
@@ -104,5 +110,8 @@ func TestUpdateProfileHandler_DuplicateUsername_Returns409(t *testing.T) {
 	r.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusConflict, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotEmpty(t, resp["error"])
 }
 

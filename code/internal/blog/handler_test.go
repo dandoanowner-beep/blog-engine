@@ -17,6 +17,8 @@ import (
 
 // --- mock blog service ---
 
+var _ blog.BlogService = (*mockBlogService)(nil)
+
 type mockBlogService struct{ mock.Mock }
 
 func (m *mockBlogService) Create(ctx context.Context, input blog.CreateInput) (*blog.Blog, error) {
@@ -77,6 +79,9 @@ func TestGetBlogHandler_NotFound_Returns404(t *testing.T) {
 	r.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusNotFound, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotEmpty(t, resp["error"])
 }
 
 func TestGetBlogHandler_AccessDenied_Returns403(t *testing.T) {
@@ -94,6 +99,9 @@ func TestGetBlogHandler_AccessDenied_Returns403(t *testing.T) {
 	r.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusForbidden, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotEmpty(t, resp["error"])
 }
 
 func TestGetBlogHandler_GuestGetPartialBlog_Returns200WithPartialFlag(t *testing.T) {
@@ -161,4 +169,7 @@ func TestCreateBlogHandler_MissingTitle_Returns422(t *testing.T) {
 	r.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusUnprocessableEntity, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotEmpty(t, resp["error"])
 }

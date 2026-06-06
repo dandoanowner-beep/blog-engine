@@ -13,6 +13,9 @@ import (
 
 // --- Mocks ---
 
+var _ auth.Repository = (*mockRepo)(nil)
+var _ auth.EmailSender = (*mockEmail)(nil)
+
 type mockRepo struct{ mock.Mock }
 
 func (m *mockRepo) CreateUser(ctx context.Context, u *auth.User) error {

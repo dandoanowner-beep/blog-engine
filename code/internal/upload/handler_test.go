@@ -17,6 +17,8 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+var _ upload.UploadService = (*mockUploadSvc)(nil)
+
 type mockUploadSvc struct{ mock.Mock }
 
 func (m *mockUploadSvc) UploadImage(ctx context.Context, data []byte, mimeType, filename string) (string, error) {

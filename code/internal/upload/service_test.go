@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+var _ upload.R2Client = (*mockR2)(nil)
+
 type mockR2 struct{ mock.Mock }
 
 func (m *mockR2) PutObject(ctx context.Context, key string, data []byte, mimeType string) (string, error) {

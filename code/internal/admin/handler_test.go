@@ -15,6 +15,8 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+var _ admin.Repository = (*mockAdminRepo)(nil)
+
 type mockAdminRepo struct{ mock.Mock }
 
 func (m *mockAdminRepo) ListUsers(ctx context.Context, page int, role string) ([]*admin.UserRow, int, error) {
@@ -52,6 +54,10 @@ func TestListUsersHandler_Returns200(t *testing.T) {
 	h.ListUsers(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotNil(t, resp["users"])
+	assert.Equal(t, float64(1), resp["total"])
 }
 
 func TestChangeRoleHandler_Success(t *testing.T) {
@@ -71,6 +77,9 @@ func TestChangeRoleHandler_Success(t *testing.T) {
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotEmpty(t, resp["message"])
 }
 
 func TestChangeRoleHandler_InvalidRole_Returns400(t *testing.T) {
@@ -87,6 +96,9 @@ func TestChangeRoleHandler_InvalidRole_Returns400(t *testing.T) {
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotEmpty(t, resp["error"])
 }
 
 func TestGetStatsHandler_Returns200(t *testing.T) {

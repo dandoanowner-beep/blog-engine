@@ -12,6 +12,8 @@ import (
 
 // --- Mock ---
 
+var _ search.Repository = (*mockRepo)(nil)
+
 type mockRepo struct{ mock.Mock }
 
 func (m *mockRepo) SearchBlogs(ctx context.Context, q string, viewerID uuid.UUID, page int) ([]*search.BlogResult, int, error) {

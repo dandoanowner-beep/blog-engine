@@ -49,6 +49,12 @@ jobs:
         working-directory: ./code
         run: go build ./cmd/server
 
+      - name: Lint (go vet + handler test assertion check)
+        working-directory: ./code
+        run: |
+          go vet ./...
+          bash scripts/check-handler-tests.sh
+
       - name: Run tests with coverage
         working-directory: ./code
         run: go test ./... -coverprofile=coverage.out -covermode=atomic
@@ -62,16 +68,9 @@ jobs:
           R2_BUCKET_NAME: test
           R2_PUBLIC_URL: https://test.r2.dev
 
-      - name: Check coverage gate (80% minimum)
+      - name: Check coverage gate (80% business-logic minimum)
         working-directory: ./code
-        run: |
-          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-          echo "Total coverage: ${COVERAGE}%"
-          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
-            echo "FAIL: Coverage ${COVERAGE}% is below 80% minimum"
-            exit 1
-          fi
-          echo "PASS: Coverage ${COVERAGE}% meets 80% minimum"
+        run: bash scripts/check-coverage.sh
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4

@@ -47,4 +47,7 @@ func TestUpdateBlogHandler_Returns200(t *testing.T) {
 	h.UpdateBlog(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotEmpty(t, resp["message"])
 }

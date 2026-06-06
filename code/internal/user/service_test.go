@@ -12,6 +12,8 @@ import (
 
 // --- Mock ---
 
+var _ user.Repository = (*mockRepo)(nil)
+
 type mockRepo struct{ mock.Mock }
 
 func (m *mockRepo) GetByUsername(ctx context.Context, username string) (*user.Profile, error) {
