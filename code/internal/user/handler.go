@@ -1,14 +1,11 @@
 package user
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 
 	"blog-engine/internal/middleware"
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Handler struct{ svc *Service }
@@ -46,32 +43,6 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"user": updated})
-}
-
-type PostgresRepository struct{ db *pgxpool.Pool }
-
-func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
-	return &PostgresRepository{db: db}
-}
-
-func (r *PostgresRepository) GetByUsername(ctx context.Context, username string) (*Profile, error) {
-	return nil, ErrNotFound
-}
-
-func (r *PostgresRepository) GetByID(ctx context.Context, id uuid.UUID) (*Profile, error) {
-	return nil, ErrNotFound
-}
-
-func (r *PostgresRepository) Update(ctx context.Context, id uuid.UUID, input UpdateInput) (*Profile, error) {
-	return nil, nil
-}
-
-func (r *PostgresRepository) UsernameExists(ctx context.Context, username string, excludeID uuid.UUID) (bool, error) {
-	return false, nil
-}
-
-func (r *PostgresRepository) IsFriend(ctx context.Context, viewerID, profileID uuid.UUID) (bool, error) {
-	return false, nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {

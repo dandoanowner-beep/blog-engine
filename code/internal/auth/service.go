@@ -112,34 +112,34 @@ func (s *Service) VerifyEmail(ctx context.Context, token string) error {
 	return s.repo.MarkTokenUsed(ctx, token)
 }
 
-func (s *Service) Login(ctx context.Context, email, password string) (*TokenPair, error) {
+func (s *Service) Login(ctx context.Context, email, password string) (*TokenPair, *User, error) {
 	user, err := s.repo.GetUserByEmail(ctx, email)
 	if err != nil {
-		return nil, ErrInvalidCredentials
+		return nil, nil, ErrInvalidCredentials
 	}
 	if user.LockedUntil != nil && time.Now().Before(*user.LockedUntil) {
-		return nil, ErrAccountLocked
+		return nil, nil, ErrAccountLocked
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
 		_ = s.repo.IncrementLoginAttempts(ctx, email)
 		if user.LoginAttempts+1 >= 5 {
 			lockUntil := time.Now().Add(15 * time.Minute)
 			_ = s.repo.LockAccount(ctx, email, lockUntil)
-			return nil, ErrAccountLocked
+			return nil, nil, ErrAccountLocked
 		}
-		return nil, ErrInvalidCredentials
+		return nil, nil, ErrInvalidCredentials
 	}
 	_ = s.repo.ResetLoginAttempts(ctx, email)
 
 	access, err := s.jwt.GenerateAccessToken(user.ID, user.Role)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	refresh, err := s.jwt.GenerateRefreshToken(user.ID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return &TokenPair{AccessToken: access, RefreshToken: refresh}, nil
+	return &TokenPair{AccessToken: access, RefreshToken: refresh}, user, nil
 }
 
 func (s *Service) ForgotPassword(ctx context.Context, email string) error {

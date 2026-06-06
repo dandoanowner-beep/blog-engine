@@ -192,10 +192,12 @@ func TestLogin_Success(t *testing.T) {
 	repo.On("GetUserByEmail", mock.Anything, "test@example.com").Return(user, nil)
 	repo.On("ResetLoginAttempts", mock.Anything, "test@example.com").Return(nil)
 
-	tokens, err := svc.Login(context.Background(), "test@example.com", "password123")
+	tokens, user, err := svc.Login(context.Background(), "test@example.com", "password123")
 	assert.NoError(t, err)
 	assert.NotEmpty(t, tokens.AccessToken)
 	assert.NotEmpty(t, tokens.RefreshToken)
+	assert.NotNil(t, user)
+	assert.Equal(t, "test@example.com", user.Email)
 }
 
 func TestLogin_WrongPassword(t *testing.T) {
@@ -213,7 +215,7 @@ func TestLogin_WrongPassword(t *testing.T) {
 	repo.On("GetUserByEmail", mock.Anything, "test@example.com").Return(user, nil)
 	repo.On("IncrementLoginAttempts", mock.Anything, "test@example.com").Return(nil)
 
-	_, err := svc.Login(context.Background(), "test@example.com", "wrongpassword")
+	_, _, err := svc.Login(context.Background(), "test@example.com", "wrongpassword")
 	assert.ErrorIs(t, err, auth.ErrInvalidCredentials)
 }
 
@@ -230,7 +232,7 @@ func TestLogin_LockedAccount(t *testing.T) {
 
 	repo.On("GetUserByEmail", mock.Anything, "test@example.com").Return(user, nil)
 
-	_, err := svc.Login(context.Background(), "test@example.com", "anypassword")
+	_, _, err := svc.Login(context.Background(), "test@example.com", "anypassword")
 	assert.ErrorIs(t, err, auth.ErrAccountLocked)
 }
 
@@ -249,7 +251,7 @@ func TestLogin_FifthFailedAttemptLocksAccount(t *testing.T) {
 	repo.On("IncrementLoginAttempts", mock.Anything, "test@example.com").Return(nil)
 	repo.On("LockAccount", mock.Anything, "test@example.com", mock.Anything).Return(nil)
 
-	_, err := svc.Login(context.Background(), "test@example.com", "wrongpassword")
+	_, _, err := svc.Login(context.Background(), "test@example.com", "wrongpassword")
 	assert.ErrorIs(t, err, auth.ErrAccountLocked)
 	repo.AssertCalled(t, "LockAccount", mock.Anything, "test@example.com", mock.Anything)
 }
@@ -321,4 +323,74 @@ func TestBlockUser_CannotBlockSelf(t *testing.T) {
 	id := uuid.New()
 	err := svc.BlockUser(context.Background(), id, id)
 	assert.ErrorIs(t, err, auth.ErrCannotBlockSelf)
+}
+
+func TestResetPassword_Success(t *testing.T) {
+	repo := &mockRepo{}
+	email := &mockEmail{}
+	svc := auth.NewService(repo, email, "jwt-secret", "refresh-secret", "http://app.test")
+
+	userID := uuid.New()
+	tok := &auth.PasswordResetToken{Token: "reset-token", UserID: userID, ExpiresAt: time.Now().Add(time.Hour), Used: false}
+	user := &auth.User{ID: userID, Email: "test@example.com", PasswordHash: "old"}
+
+	repo.On("GetPasswordReset", mock.Anything, "reset-token").Return(tok, nil)
+	repo.On("GetUserByID", mock.Anything, userID).Return(user, nil)
+	repo.On("UpdateUser", mock.Anything, mock.AnythingOfType("*auth.User")).Return(nil)
+	repo.On("MarkTokenUsed", mock.Anything, "reset-token").Return(nil)
+
+	err := svc.ResetPassword(context.Background(), "reset-token", "newpassword123")
+	assert.NoError(t, err)
+}
+
+func TestResetPassword_ExpiredToken(t *testing.T) {
+	repo := &mockRepo{}
+	email := &mockEmail{}
+	svc := auth.NewService(repo, email, "jwt-secret", "refresh-secret", "http://app.test")
+
+	tok := &auth.PasswordResetToken{Token: "expired-token", UserID: uuid.New(), ExpiresAt: time.Now().Add(-time.Hour), Used: false}
+	repo.On("GetPasswordReset", mock.Anything, "expired-token").Return(tok, nil)
+
+	err := svc.ResetPassword(context.Background(), "expired-token", "newpassword123")
+	assert.ErrorIs(t, err, auth.ErrTokenExpired)
+}
+
+func TestResetPassword_PasswordTooShort(t *testing.T) {
+	repo := &mockRepo{}
+	email := &mockEmail{}
+	svc := auth.NewService(repo, email, "jwt-secret", "refresh-secret", "http://app.test")
+
+	err := svc.ResetPassword(context.Background(), "any-token", "short")
+	assert.ErrorIs(t, err, auth.ErrPasswordTooShort)
+}
+
+func TestRefreshToken_InvalidToken_ReturnsError(t *testing.T) {
+	repo := &mockRepo{}
+	email := &mockEmail{}
+	svc := auth.NewService(repo, email, "jwt-secret", "refresh-secret", "http://app.test")
+
+	// An invalid token exercises the ValidateRefreshToken error path
+	_, err := svc.RefreshToken(context.Background(), "not.a.valid.jwt")
+	assert.Error(t, err)
+}
+
+func TestRefreshToken_RoundTrip(t *testing.T) {
+	repo := &mockRepo{}
+	emailSvc := &mockEmail{}
+	svc := auth.NewService(repo, emailSvc, "jwt-secret", "refresh-secret", "http://app.test")
+
+	userID := uuid.New()
+	hash, _ := auth.HashPassword("password123")
+	user := &auth.User{ID: userID, Email: "rt@test.com", Role: "user", PasswordHash: hash}
+
+	repo.On("GetUserByEmail", mock.Anything, "rt@test.com").Return(user, nil)
+	repo.On("ResetLoginAttempts", mock.Anything, "rt@test.com").Return(nil)
+	repo.On("GetUserByID", mock.Anything, userID).Return(user, nil)
+
+	tokens, _, err := svc.Login(context.Background(), "rt@test.com", "password123")
+	assert.NoError(t, err)
+
+	newAccess, err := svc.RefreshToken(context.Background(), tokens.RefreshToken)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, newAccess)
 }

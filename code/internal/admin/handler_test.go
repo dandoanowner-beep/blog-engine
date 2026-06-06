@@ -119,4 +119,54 @@ func TestListReportsHandler_Returns200(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.ListReports(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotNil(t, resp["reports"])
+	assert.Equal(t, float64(1), resp["total"])
+}
+
+func TestResolveReportHandler_Success(t *testing.T) {
+	repo := &mockAdminRepo{}
+	svc := admin.NewService(repo)
+	h := admin.NewHandler(svc)
+
+	reportID := uuid.New()
+	// ResolveReport reads resolverID via middleware.UserIDFromContext which returns uuid.Nil when
+	// context has no auth — mock with uuid.Nil to match what the handler actually passes.
+	repo.On("ResolveReport", mock.Anything, reportID, "dismiss", uuid.Nil).Return(nil)
+
+	r := chi.NewRouter()
+	r.Post("/admin/reports/{id}/resolve", h.ResolveReport)
+
+	body := `{"action":"dismiss"}`
+	req := httptest.NewRequest(http.MethodPost, "/admin/reports/"+reportID.String()+"/resolve", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.Equal(t, "resolved", resp["message"])
+}
+
+func TestResolveReportHandler_InvalidAction_Returns400(t *testing.T) {
+	repo := &mockAdminRepo{}
+	svc := admin.NewService(repo)
+	h := admin.NewHandler(svc)
+
+	reportID := uuid.New()
+
+	r := chi.NewRouter()
+	r.Post("/admin/reports/{id}/resolve", h.ResolveReport)
+
+	body := `{"action":"invalid_action"}`
+	req := httptest.NewRequest(http.MethodPost, "/admin/reports/"+reportID.String()+"/resolve", bytes.NewBufferString(body))
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotEmpty(t, resp["error"])
 }

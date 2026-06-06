@@ -231,3 +231,149 @@ func TestReportHandler_DuplicateReport_Returns409(t *testing.T) {
 	r.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusConflict, rec.Code)
 }
+
+func TestSendFriendRequestHandler_Success(t *testing.T) {
+	svc := &mockSocialSvc{}
+	h := social.NewHandler(svc)
+
+	senderID := uuid.New()
+	receiverID := uuid.New()
+	fr := &social.FriendRequest{ID: uuid.New(), SenderID: senderID, ReceiverID: receiverID}
+	svc.On("SendFriendRequest", mock.Anything, senderID, receiverID).Return(fr, nil)
+
+	r := chi.NewRouter()
+	r.Post("/users/{id}/friend-request", func(w http.ResponseWriter, req *http.Request) {
+		h.SendFriendRequest(w, withUser(req, senderID, "user"))
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/users/"+receiverID.String()+"/friend-request", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusCreated, rec.Code)
+}
+
+func TestSendFriendRequestHandler_AlreadyPending_Returns409(t *testing.T) {
+	svc := &mockSocialSvc{}
+	h := social.NewHandler(svc)
+
+	senderID := uuid.New()
+	receiverID := uuid.New()
+	svc.On("SendFriendRequest", mock.Anything, senderID, receiverID).Return(nil, social.ErrRequestAlreadyPending)
+
+	r := chi.NewRouter()
+	r.Post("/users/{id}/friend-request", func(w http.ResponseWriter, req *http.Request) {
+		h.SendFriendRequest(w, withUser(req, senderID, "user"))
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/users/"+receiverID.String()+"/friend-request", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusConflict, rec.Code)
+}
+
+func TestRespondFriendRequestHandler_Accept_Returns200(t *testing.T) {
+	svc := &mockSocialSvc{}
+	h := social.NewHandler(svc)
+
+	responderID := uuid.New()
+	reqID := uuid.New()
+	svc.On("RespondFriendRequest", mock.Anything, reqID, responderID, "accept").Return(nil)
+
+	r := chi.NewRouter()
+	r.Post("/friend-requests/{id}/respond", func(w http.ResponseWriter, req *http.Request) {
+		h.RespondFriendRequest(w, withUser(req, responderID, "user"))
+	})
+
+	body := `{"action":"accept"}`
+	req := httptest.NewRequest(http.MethodPost, "/friend-requests/"+reqID.String()+"/respond", bytes.NewBufferString(body))
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.Equal(t, "accepted", resp["status"])
+}
+
+func TestUnfriendHandler_Returns204(t *testing.T) {
+	svc := &mockSocialSvc{}
+	h := social.NewHandler(svc)
+
+	userID := uuid.New()
+	otherID := uuid.New()
+	svc.On("DeleteFriendship", mock.Anything, userID, otherID).Return(nil)
+
+	r := chi.NewRouter()
+	r.Delete("/users/{id}/friend", func(w http.ResponseWriter, req *http.Request) {
+		h.Unfriend(w, withUser(req, userID, "user"))
+	})
+
+	req := httptest.NewRequest(http.MethodDelete, "/users/"+otherID.String()+"/friend", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusNoContent, rec.Code)
+}
+
+func TestRemoveReactionHandler_Returns200(t *testing.T) {
+	svc := &mockSocialSvc{}
+	h := social.NewHandler(svc)
+
+	userID := uuid.New()
+	blogID := uuid.New()
+	svc.On("RemoveReaction", mock.Anything, userID, blogID).Return(9, 1, nil)
+
+	r := chi.NewRouter()
+	r.Delete("/blogs/{id}/react", func(w http.ResponseWriter, req *http.Request) {
+		h.RemoveReaction(w, withUser(req, userID, "user"))
+	})
+
+	req := httptest.NewRequest(http.MethodDelete, "/blogs/"+blogID.String()+"/react", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.Equal(t, float64(9), resp["like_count"])
+	assert.Equal(t, float64(1), resp["dislike_count"])
+}
+
+func TestDeleteCommentHandler_Returns204(t *testing.T) {
+	svc := &mockSocialSvc{}
+	h := social.NewHandler(svc)
+
+	userID := uuid.New()
+	commentID := uuid.New()
+	svc.On("DeleteComment", mock.Anything, commentID, userID, "user").Return(nil)
+
+	r := chi.NewRouter()
+	r.Delete("/comments/{id}", func(w http.ResponseWriter, req *http.Request) {
+		h.DeleteComment(w, withUser(req, userID, "user"))
+	})
+
+	req := httptest.NewRequest(http.MethodDelete, "/comments/"+commentID.String(), nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusNoContent, rec.Code)
+}
+
+func TestBlockUserHandler_Returns201(t *testing.T) {
+	svc := &mockSocialSvc{}
+	h := social.NewHandler(svc)
+
+	req := httptest.NewRequest(http.MethodPost, "/users/123/block", nil)
+	rec := httptest.NewRecorder()
+	h.BlockUser(rec, req)
+	assert.Equal(t, http.StatusCreated, rec.Code)
+}
+
+func TestUnblockUserHandler_Returns204(t *testing.T) {
+	svc := &mockSocialSvc{}
+	h := social.NewHandler(svc)
+
+	req := httptest.NewRequest(http.MethodDelete, "/users/123/block", nil)
+	rec := httptest.NewRecorder()
+	h.UnblockUser(rec, req)
+	assert.Equal(t, http.StatusNoContent, rec.Code)
+}

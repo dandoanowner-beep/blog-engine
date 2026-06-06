@@ -1,14 +1,11 @@
 package search
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
 
 	"blog-engine/internal/middleware"
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Handler struct{ svc *Service }
@@ -28,24 +25,6 @@ func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, result)
-}
-
-type PostgresRepository struct{ db *pgxpool.Pool }
-
-func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
-	return &PostgresRepository{db: db}
-}
-
-func (r *PostgresRepository) SearchBlogs(ctx context.Context, q string, viewerID uuid.UUID, page int) ([]*BlogResult, int, error) {
-	return []*BlogResult{}, 0, nil
-}
-
-func (r *PostgresRepository) SearchUsers(ctx context.Context, q string, page int) ([]*UserResult, int, error) {
-	return []*UserResult{}, 0, nil
-}
-
-func (r *PostgresRepository) SearchTags(ctx context.Context, q string, page int) ([]*TagResult, int, error) {
-	return []*TagResult{}, 0, nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {

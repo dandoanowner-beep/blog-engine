@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -9,7 +8,6 @@ import (
 	"blog-engine/internal/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Handler struct{ svc *Service }
@@ -99,36 +97,6 @@ func (h *Handler) GetStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, stats)
-}
-
-type PostgresRepository struct{ db *pgxpool.Pool }
-
-func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
-	return &PostgresRepository{db: db}
-}
-
-func (r *PostgresRepository) ListUsers(ctx context.Context, page int, role string) ([]*UserRow, int, error) {
-	return []*UserRow{}, 0, nil
-}
-
-func (r *PostgresRepository) ChangeUserRole(ctx context.Context, userID uuid.UUID, role string) error {
-	return nil
-}
-
-func (r *PostgresRepository) ListReports(ctx context.Context, status string, page int) ([]*ReportRow, int, error) {
-	return []*ReportRow{}, 0, nil
-}
-
-func (r *PostgresRepository) ResolveReport(ctx context.Context, reportID uuid.UUID, action string, resolverID uuid.UUID) error {
-	return nil
-}
-
-func (r *PostgresRepository) DeleteContent(ctx context.Context, reportID uuid.UUID) error {
-	return nil
-}
-
-func (r *PostgresRepository) GetStats(ctx context.Context) (*Stats, error) {
-	return &Stats{}, nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {

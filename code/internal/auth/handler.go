@@ -10,7 +10,7 @@ import (
 
 type AuthService interface {
 	Register(ctx context.Context, email, username, password string) (*User, error)
-	Login(ctx context.Context, email, password string) (*TokenPair, error)
+	Login(ctx context.Context, email, password string) (*TokenPair, *User, error)
 	VerifyEmail(ctx context.Context, token string) error
 	ForgotPassword(ctx context.Context, email string) error
 	ResetPassword(ctx context.Context, token, password string) error
@@ -64,7 +64,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	tokens, err := h.svc.Login(r.Context(), req.Email, req.Password)
+	tokens, user, err := h.svc.Login(r.Context(), req.Email, req.Password)
 	if err != nil {
 		switch err {
 		case ErrInvalidCredentials:
@@ -87,6 +87,14 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	})
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"access_token": tokens.AccessToken,
+		"user": map[string]interface{}{
+			"id":         user.ID,
+			"username":   user.Username,
+			"email":      user.Email,
+			"avatar_url": user.AvatarURL,
+			"role":       user.Role,
+			"verified":   user.Verified,
+		},
 	})
 }
 

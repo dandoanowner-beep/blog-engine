@@ -26,12 +26,17 @@ func (m *mockAuthService) Register(ctx context.Context, email, username, passwor
 	}
 	return args.Get(0).(*auth.User), args.Error(1)
 }
-func (m *mockAuthService) Login(ctx context.Context, email, password string) (*auth.TokenPair, error) {
+func (m *mockAuthService) Login(ctx context.Context, email, password string) (*auth.TokenPair, *auth.User, error) {
 	args := m.Called(ctx, email, password)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+	var tp *auth.TokenPair
+	var u *auth.User
+	if args.Get(0) != nil {
+		tp = args.Get(0).(*auth.TokenPair)
 	}
-	return args.Get(0).(*auth.TokenPair), args.Error(1)
+	if args.Get(1) != nil {
+		u = args.Get(1).(*auth.User)
+	}
+	return tp, u, args.Error(2)
 }
 func (m *mockAuthService) VerifyEmail(ctx context.Context, token string) error {
 	return m.Called(ctx, token).Error(0)
@@ -109,7 +114,8 @@ func TestLoginHandler_Success(t *testing.T) {
 	h := auth.NewHandler(svc)
 
 	tokens := &auth.TokenPair{AccessToken: "access.tok.en", RefreshToken: "refresh.tok.en"}
-	svc.On("Login", mock.Anything, "test@example.com", "password123").Return(tokens, nil)
+	user := &auth.User{ID: uuid.New(), Username: "testuser", Email: "test@example.com", Role: "user", Verified: true}
+	svc.On("Login", mock.Anything, "test@example.com", "password123").Return(tokens, user, nil)
 
 	body := `{"email":"test@example.com","password":"password123"}`
 	req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString(body))
@@ -122,13 +128,20 @@ func TestLoginHandler_Success(t *testing.T) {
 	var resp map[string]interface{}
 	json.NewDecoder(rec.Body).Decode(&resp)
 	assert.Equal(t, "access.tok.en", resp["access_token"])
+	userMap, ok := resp["user"].(map[string]interface{})
+	assert.True(t, ok, "response must contain a user object")
+	assert.NotEmpty(t, userMap["id"])
+	assert.Equal(t, "testuser", userMap["username"])
+	assert.Equal(t, "test@example.com", userMap["email"])
+	assert.Equal(t, "user", userMap["role"])
+	assert.Equal(t, true, userMap["verified"])
 }
 
 func TestLoginHandler_InvalidCredentials_Returns401(t *testing.T) {
 	svc := &mockAuthService{}
 	h := auth.NewHandler(svc)
 
-	svc.On("Login", mock.Anything, "x@x.com", "wrong").Return(nil, auth.ErrInvalidCredentials)
+	svc.On("Login", mock.Anything, "x@x.com", "wrong").Return(nil, nil, auth.ErrInvalidCredentials)
 
 	body := `{"email":"x@x.com","password":"wrong"}`
 	req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString(body))
@@ -143,7 +156,7 @@ func TestLoginHandler_LockedAccount_Returns423(t *testing.T) {
 	svc := &mockAuthService{}
 	h := auth.NewHandler(svc)
 
-	svc.On("Login", mock.Anything, "locked@x.com", "pass").Return(nil, auth.ErrAccountLocked)
+	svc.On("Login", mock.Anything, "locked@x.com", "pass").Return(nil, nil, auth.ErrAccountLocked)
 
 	body := `{"email":"locked@x.com","password":"pass"}`
 	req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString(body))
