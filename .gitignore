@@ -1,4 +1,4 @@
-# Environment — never commit real credentials
+﻿# Environment — never commit real credentials
 .env.local
 .env.*.local
 .env
@@ -17,7 +17,7 @@ context.json
 code/server.exe
 code/server
 code/*.out
-code/coverage/
+code/coverage
 
 # Frontend build artifacts
 frontend/node_modules/
