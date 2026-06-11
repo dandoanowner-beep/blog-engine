@@ -74,6 +74,83 @@ func TestAuthMiddleware_ExpiredToken_Returns401(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 
+func TestOptionalAuth_NoToken_ProceedsAsGuest(t *testing.T) {
+	j := auth.NewJWT("test-secret", "test-refresh-secret")
+	m := middleware.NewAuth(j)
+
+	called := false
+	handler := m.OptionalAuthenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		assert.Equal(t, uuid.Nil, middleware.UserIDFromContext(r.Context()))
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("GET", "/", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+	assert.True(t, called)
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestOptionalAuth_ValidToken_SetsContext(t *testing.T) {
+	j := auth.NewJWT("test-secret", "test-refresh-secret")
+	m := middleware.NewAuth(j)
+
+	called := false
+	handler := m.OptionalAuthenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		assert.NotEqual(t, uuid.Nil, middleware.UserIDFromContext(r.Context()))
+		assert.Equal(t, "user", middleware.RoleFromContext(r.Context()))
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	tok := makeJWT(t, "user")
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+	assert.True(t, called)
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestOptionalAuth_InvalidToken_Returns401(t *testing.T) {
+	j := auth.NewJWT("test-secret", "test-refresh-secret")
+	m := middleware.NewAuth(j)
+
+	called := false
+	handler := m.OptionalAuthenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "Bearer not-a-real-token")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+	assert.False(t, called, "controller must not run with an invalid token")
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+func TestOptionalAuth_ExpiredToken_Returns401(t *testing.T) {
+	j := auth.NewJWT("test-secret", "test-refresh-secret")
+	m := middleware.NewAuth(j)
+	tok, _ := j.GenerateAccessTokenWithExpiry(uuid.New(), "user", time.Now().Add(-time.Minute))
+
+	handler := m.OptionalAuthenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
 func TestRBAC_AdminCanAccessAdminRoute(t *testing.T) {
 	j := auth.NewJWT("test-secret", "test-refresh-secret")
 	authM := middleware.NewAuth(j)
@@ -107,6 +184,48 @@ func TestRBAC_UserCannotAccessAdminRoute(t *testing.T) {
 
 	tok := makeJWT(t, "user")
 	req := httptest.NewRequest("GET", "/admin", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+// CR-001 personal-blog pivot: blog creation is owner-only. These pin the
+// RequireRole("owner") policy used on POST /blogs in main.go.
+func TestRBAC_OwnerCanAccessOwnerOnlyRoute(t *testing.T) {
+	j := auth.NewJWT("test-secret", "test-refresh-secret")
+	authM := middleware.NewAuth(j)
+	rbacM := middleware.NewRBAC()
+
+	handler := authM.Authenticate(rbacM.RequireRole("owner")(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}),
+	))
+
+	tok := makeJWT(t, "owner")
+	req := httptest.NewRequest("POST", "/blogs", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestRBAC_RegularUserCannotAccessOwnerOnlyRoute(t *testing.T) {
+	j := auth.NewJWT("test-secret", "test-refresh-secret")
+	authM := middleware.NewAuth(j)
+	rbacM := middleware.NewRBAC()
+
+	handler := authM.Authenticate(rbacM.RequireRole("owner")(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}),
+	))
+
+	tok := makeJWT(t, "user")
+	req := httptest.NewRequest("POST", "/blogs", nil)
 	req.Header.Set("Authorization", "Bearer "+tok)
 	rec := httptest.NewRecorder()
 

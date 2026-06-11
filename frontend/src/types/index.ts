@@ -23,10 +23,13 @@ export interface BlogCard {
   privacy: 'public' | 'friend_only' | 'only_me'
   published_at: string
   partial?: boolean
+  title_en?: string
+  translation_status?: 'none' | 'pending' | 'done' | 'failed'
 }
 
 export interface Blog extends BlogCard {
   content: string
+  body_en?: string
 }
 
 export interface Comment {

@@ -8,21 +8,25 @@ export interface CreateBlogInput {
   privacy: 'public' | 'friend_only' | 'only_me'
   status: 'draft' | 'published'
   tag_names: string[]
-  category_ids: string[]
+  category_names: string[]
+}
+
+export interface CategoryWithCount {
+  id: string
+  name: string
+  slug: string
+  blog_count: number
 }
 
 export const blogsApi = {
-  getExploreFeed: (page = 1, tag?: string, category?: string) =>
+  getArticlesFeed: (page = 1, category?: string) =>
     api.get<{ blogs: BlogCard[]; total: number; page: number; per_page: number }>(
-      '/blogs/feed/explore',
-      { params: { page, tag, category } }
+      '/blogs/feed',
+      { params: { page, ...(category ? { category } : {}) } }
     ),
 
-  getFollowingFeed: (page = 1) =>
-    api.get<{ blogs: BlogCard[]; total: number; page: number }>(
-      '/blogs/feed/following',
-      { params: { page } }
-    ),
+  getCategories: () =>
+    api.get<{ categories: CategoryWithCount[] }>('/categories'),
 
   getBlog: (id: string) =>
     api.get<Blog & { partial?: boolean }>(`/blogs/${id}`),

@@ -1,21 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+﻿import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import Feed from '../pages/Feed'
 import { blogsApi } from '../api/blogs'
-import { useAuthStore } from '../store/auth'
 import type { BlogCard } from '../types'
 
 vi.mock('../api/blogs', () => ({
   blogsApi: {
-    getExploreFeed: vi.fn(),
-    getFollowingFeed: vi.fn(),
+    getArticlesFeed: vi.fn(),
   },
 }))
-
-vi.mock('../store/auth', () => ({ useAuthStore: vi.fn() }))
 
 const makeBlog = (id: string, title: string): BlogCard => ({
   id,
@@ -40,51 +35,36 @@ function wrap(ui: React.ReactElement) {
   )
 }
 
-describe('Feed page', () => {
+// CR-001 personal-blog pivot: one article feed, no Explore/Following tabs.
+describe('Feed page (single article feed)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(useAuthStore).mockReturnValue({ user: null } as never)
-    vi.mocked(blogsApi.getExploreFeed).mockResolvedValue({
+    vi.mocked(blogsApi.getArticlesFeed).mockResolvedValue({
       data: { blogs: [makeBlog('b1', 'First Post')], total: 1, page: 1, per_page: 9 },
     } as never)
   })
 
-  it('renders Explore tab by default', () => {
-    wrap(<Feed />)
-    expect(screen.getByTestId('tab-explore')).toBeInTheDocument()
-  })
-
-  it('renders Following tab', () => {
-    wrap(<Feed />)
-    expect(screen.getByTestId('tab-following')).toBeInTheDocument()
-  })
-
-  it('renders blog cards from explore feed', async () => {
+  it('renders article cards', async () => {
     wrap(<Feed />)
     await waitFor(() => expect(screen.getByText('First Post')).toBeInTheDocument())
   })
 
-  it('shows login prompt on Following tab for guest', async () => {
+  it('does not render Explore/Following tabs', () => {
     wrap(<Feed />)
-    await userEvent.click(screen.getByTestId('tab-following'))
-    await waitFor(() => expect(screen.getByText(/sign in to see posts/i)).toBeInTheDocument())
+    expect(screen.queryByTestId('tab-explore')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('tab-following')).not.toBeInTheDocument()
   })
 
-  it('fetches following feed when user is logged in and Following tab active', async () => {
-    vi.mocked(useAuthStore).mockReturnValue({ user: { id: 'u1', username: 'alice', role: 'user' } } as never)
-    vi.mocked(blogsApi.getFollowingFeed).mockResolvedValue({
-      data: { blogs: [makeBlog('b2', 'Following Post')], total: 1, page: 1 },
+  it('fetches page 1 of the article feed on mount', async () => {
+    wrap(<Feed />)
+    await waitFor(() => expect(blogsApi.getArticlesFeed).toHaveBeenCalledWith(1))
+  })
+
+  it('shows empty state when there are no posts', async () => {
+    vi.mocked(blogsApi.getArticlesFeed).mockResolvedValue({
+      data: { blogs: [], total: 0, page: 1, per_page: 9 },
     } as never)
-
     wrap(<Feed />)
-    await userEvent.click(screen.getByTestId('tab-following'))
-    await waitFor(() => expect(blogsApi.getFollowingFeed).toHaveBeenCalled())
-  })
-
-  it('resets to page 1 on tab change', async () => {
-    wrap(<Feed />)
-    await userEvent.click(screen.getByTestId('tab-following'))
-    await userEvent.click(screen.getByTestId('tab-explore'))
-    expect(blogsApi.getExploreFeed).toHaveBeenCalledWith(1)
+    await waitFor(() => expect(screen.getByText(/no posts yet/i)).toBeInTheDocument())
   })
 })
