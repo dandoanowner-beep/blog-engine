@@ -87,6 +87,10 @@ GOOGLE_REDIRECT_URL=http://localhost:8080/api/v1/auth/google/callback
 # App
 APP_URL=http://localhost:3000
 PORT=8080
+
+# Claude API (optional — enables automatic VI→EN translation)
+# Leave blank to disable translation (posts will stay translation_status="none")
+ANTHROPIC_API_KEY=your-anthropic-api-key
 ```
 
 ---
@@ -103,12 +107,11 @@ Key endpoints available in Sprint 1:
 - `POST /auth/login` — get JWT tokens
 - `GET  /auth/google` — Google OAuth
 - `POST /auth/forgot-password` — request reset email
-- `POST /blogs` — create blog (auth + verified required)
+- `POST /blogs` — create blog (owner-only since CR-001; auth + verified required)
 - `GET  /blogs/:id` — read blog (privacy enforced)
 - `DELETE /blogs/:id` — delete blog
 - `POST /uploads/image` — upload image to R2
-- `GET  /blogs/feed/explore` — Explore feed
-- `GET  /blogs/feed/following` — Following feed (auth required)
+- `GET  /blogs/feed` — Articles feed (public; replaces explore/following feeds per CR-001)
 
 Full API reference: `docs/API_CONTRACT.md`
 
@@ -186,8 +189,8 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"you@example.com","password":"password123"}'
 
-# Explore feed (public)
-curl http://localhost:8080/api/v1/blogs/feed/explore
+# Articles feed (public)
+curl http://localhost:8080/api/v1/blogs/feed
 ```
 
 ---
@@ -255,3 +258,113 @@ wsl -d docker-desktop ip link set eth0 mtu 1450
 | GET | `/admin/reports?status=&page=` | Reports queue (moderator+) |
 | PATCH | `/admin/reports/:id/resolve` | Resolve a report (moderator+) |
 | GET | `/admin/stats` | Platform statistics (admin+) |
+
+---
+
+## i18n-Bilingual Sprint — Backend
+
+### New Endpoint
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| PUT | `/users/me/language` | Required | Set language preference (`"vi"` or `"en"`) |
+
+### Language Preference
+
+Users can switch between Vietnamese and English:
+
+```bash
+# Set language to English
+curl -X PUT http://localhost:8080/api/v1/users/me/language \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"language":"en"}'
+# → {"language":"en"}
+
+# Set back to Vietnamese
+curl -X PUT http://localhost:8080/api/v1/users/me/language \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"language":"vi"}'
+# Valid values: "vi" | "en" — anything else returns 400
+```
+
+### Translation Feature
+
+When `ANTHROPIC_API_KEY` is set, blog posts are automatically translated Vietnamese → English in the background after creation or content update.
+
+**Response fields added to `GET /blogs/:id`:**
+
+```json
+{
+  "title":              "Tiêu đề bài viết",
+  "content":            "Nội dung ...",
+  "title_en":           "Blog post title",
+  "body_en":            "Content ...",
+  "translation_status": "done"
+}
+```
+
+**Translation statuses:**
+
+| Status | Meaning |
+|--------|---------|
+| `none` | No API key configured — translation skipped |
+| `pending` | Translation goroutine in progress |
+| `done` | Translation complete — `title_en` / `body_en` available |
+| `failed` | Claude API error — check `ANTHROPIC_API_KEY` validity |
+
+**Run the migration before starting the server:**
+
+```bash
+docker compose exec -T postgres psql -U blog -d blog_engine \
+  -f migrations/002_i18n.sql
+```
+
+Or on first startup with the updated Docker image the migration runs automatically via the migration runner.
+
+---
+
+## i18n-Bilingual Sprint — Frontend
+
+### Language Toggle
+
+A **VI / EN** toggle appears in the navigation header for all users (guests and logged-in). Clicking a button switches the UI language immediately without page reload. The preference is stored in `localStorage` under key `blog_engine_lang` and survives browser close.
+
+For logged-in users, language preference is also persisted in the DB via `PUT /users/me/language` so the preference follows the user across devices (requires a page with the toggle to be visited on each device).
+
+### Blog Content Language Switching
+
+After a blog post is translated (backend sprint — see above), readers can view it in English:
+
+| UI state | Behavior |
+|----------|----------|
+| Language = VI (default) | Always shows Vietnamese title + content |
+| Language = EN, `translation_status = done` | Shows English `title_en` + `body_en` |
+| Language = EN, `translation_status ≠ done` | Shows VI content + amber "Translation unavailable" notice |
+
+### Running the Updated Frontend
+
+After pulling the i18n-frontend changes, rebuild the Docker image:
+
+```bash
+docker compose up --build -d
+```
+
+Or in dev mode:
+
+```bash
+cd frontend
+npm install   # installs react-i18next + i18next
+npm run dev   # starts on http://localhost:3000
+```
+
+### Adding New Locale Strings
+
+All UI strings live in:
+- `frontend/src/locales/vi.json` — Vietnamese (default)
+- `frontend/src/locales/en.json` — English
+
+Key naming convention: `namespace.component.element` (e.g. `nav.signIn`, `blog.delete`).
+
+To add a string: add the key to **both** locale files, then use `t('your.key')` in the component via `const { t } = useTranslation()`.

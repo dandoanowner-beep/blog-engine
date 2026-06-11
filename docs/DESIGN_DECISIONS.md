@@ -155,3 +155,120 @@
 ### Authentication
 - Email + password
 - Google OAuth
+
+---
+
+## Round 6 — 2026-06-07 — i18n Feature Discovery
+
+### Language Support
+- **Decision**: Support Vietnamese (VI) and English (EN) only (no other languages this sprint)
+- **Default language**: Vietnamese
+
+### Translation Scope
+- **Decision**: Translate UI text AND blog content
+- **Not translated**: comments, user bio, user favorite quote (out of scope this sprint)
+
+### Blog Content Translation Approach
+- **Decision**: Option D — author writes once in Vietnamese; system auto-translates to English via Claude API at write/publish time; both versions stored in DB
+- **Rationale**: Quality of AI translation (Option C) + zero per-read cost + full stored control (Option A). Author never writes twice.
+- **Translation model**: `claude-sonnet-4-6` (cost-efficient, high quality for VI→EN)
+- **Trigger**: on blog create AND on blog edit (if title or body changed)
+- **Failure behavior**: blog still saved, translation_status=failed, readers see Vietnamese with notice
+
+### Language Preference Persistence
+- **Decision**: Store in localStorage (works for guests too); optionally sync to user profile for cross-device
+
+### Forum Feature
+- **Decision**: Deferred — do NOT build Forum in this sprint
+- **Rationale**: User chose to focus on i18n first; Forum is a large separate feature to plan properly later
+
+---
+
+## Round 7 — 2026-06-10 — CR-001: Personal Blog Pivot (core value change)
+
+**Human instruction:** "I want to build this blog like a personal blog, not a place where
+anyone can write a blog. Change the Explore button on the header."
+
+### Core Value Change
+- **Decision**: The platform is a PERSONAL blog. Only the **Owner** writes articles.
+- This **supersedes** Round 1 "Regular User: signs up, posts, comments, likes, follows" —
+  regular users no longer post. They remain READERS: register, comment, react, follow.
+
+### Scope (human chose "Full pivot")
+1. **Backend**: only `owner` role can create blogs — enforced at API routing level
+   (`POST /blogs` behind `RequireRole("owner")`), consistent with the BUG-006
+   middleware-first architecture.
+2. **Header nav**: "Explore" → **"Articles"** (VI: **"Bài viết"**) — emphasizes the
+   article archive of a single author.
+3. **Feed page**: Explore/Following tabs removed → single article feed. The Following
+   tab made sense only in a multi-writer world.
+4. **Registration stays** — readers sign up to comment/react (Round 1 guest gate and
+   comment rules unchanged).
+5. **Social features kept for readers** (follow = subscribe to the owner, comments,
+   reactions, blocks). NOT removed this round — human explicitly chose "Full pivot"
+   over "Pivot + drop social".
+
+### Explicitly unchanged
+- Guest partial-read gate (FR-BLOG-006 / BUG-006 fix)
+- Moderator/Admin roles (still needed for comment moderation)
+- i18n behavior
+- ~~Backend endpoint path `/blogs/feed/explore` kept as-is (renaming the route is API
+  churn with no product value; logged as tech debt)~~ **Resolved same day:** human chose
+  to close the debt — route renamed to `GET /blogs/feed`, following-feed route removed,
+  and the feed handler wired to the repository (see TECHNICAL_NOTES.md 2026-06-10 CR-001
+  tech debt entry and BUGS.md BUG-007)
+
+### Follow-ups (open, not blocking)
+- `/editor` page is still reachable by URL for non-owners — the create API now rejects
+  them (403), but the page could hide/redirect more gracefully later.
+- Mobile sprint (S-01) scope must inherit this pivot.
+
+---
+
+## Round 8 — 2026-06-11 — CR-002: Four new header sections
+
+**Human instruction:** Add to the header:
+- **Portfolio** — "where I public my project in here"
+- **Author** — "where I tell a story about me"
+- **Categories** — "where user can find a specific blog to read"
+- **Forums** — "where other user can share their though through some topic"
+
+### Discovery decisions
+1. **Forums scope**: placeholder page + nav link THIS round; the real forum
+   (topics/threads/replies/moderation) is its own planned sprint — re-confirms the
+   Round 6 deferral. Added to backlog as S-02.
+2. **Portfolio source**: owner-managed in DB — new `projects` table, owner-only CRUD
+   API, edit UI on the site itself (consistent with how blogs work).
+3. **Author page content**: dedicated owner-editable rich-text document (TipTap, same
+   editor stack as blogs), stored server-side — NOT the profile bio (more expressive).
+4. **Categories page**: browse list of categories (with article counts) → click
+   filters the article feed (`GET /blogs/feed?category=slug`). Restores the category
+   filter dropped during the CR-001 feed wire-up.
+
+### Nav order
+`Articles | Portfolio | Author | Categories | Forums` (VI: Bài viết | Dự án | Tác giả |
+Danh mục | Diễn đàn)
+
+### Header styling — 2026-06-11 (owner instructions, iterated live)
+- Spacing between the six header items (Bài viết → Dự án → Tác giả → Danh mục →
+  Diễn đàn → VN toggle): owner iterated 26px → 20px → **final: 40px**.
+- The five page links are **bold** (`font-bold`).
+- Implementation: links wrapped in a flex group `gap-[40px] mr-[24px]` (nav's base
+  gap-4 = 16px + 24px margin = 40px before the VN toggle) in `Layout.tsx`.
+
+### Amendment — 2026-06-11 (owner UI review)
+Process note: the Author "Edit" affordance and the "Viết bài" placement were built
+without asking the owner first — owner objected; rule recorded (never guess UI, ask
+with options/mockups). Owner's decisions when asked:
+- **"Viết bài"**: KEEP in the header where it is.
+- **Author page**: REMOVE the Edit button and inline rich-text editing entirely.
+  The page becomes a **static page built from the owner's design instructions**,
+  which the owner will provide later (logged in OPEN_QUESTIONS.md). Interim: minimal
+  placeholder, no editing UI.
+- Backend `GET/PUT /about` + `site_content` table are kept but currently unused by
+  the UI — keep/remove will be decided when the design instructions arrive.
+
+### Out of scope this round
+- Real forum implementation (S-02 backlog)
+- Tag-based browsing (categories only, as asked)
+- Portfolio/About i18n auto-translation (owner writes in one language; can be a later delta)

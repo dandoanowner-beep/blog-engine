@@ -202,3 +202,74 @@ go run ./cmd/server            # starts on :8080
 
 ### Next Sprint
 Sprint 4 — Mobile (React Native iOS + Android) — or as directed by Sprint Gate
+
+---
+
+## i18n-Bilingual Sprint — Backend (Delta Feature)
+**Dates:** 2026-06-08
+**Status:** COMPLETE
+**Deploy tag:** `i18n-backend-initial`
+
+### Completed Items
+| ID | Feature | Status |
+|----|---------|--------|
+| S-I18N-01 | Language preference (vi/en) stored per user, `PUT /users/me/language` | DONE |
+| S-I18N-02 | DB columns: `blogs.title_en`, `blogs.body_en`, `blogs.translation_status` | DONE |
+| S-I18N-03 | Async Claude API translation (goroutine) on blog Create + Update | DONE |
+| S-I18N-04 | `GET /blogs/:id` response includes `title_en`, `body_en`, `translation_status` | DONE |
+| S-I18N-05 | Graceful degradation: no `ANTHROPIC_API_KEY` → status stays `"none"` | DONE |
+
+### Metrics
+- New tests: 18 (translation: 4, blog: 8, user: 6)
+- Go API tests total: 146 / 146 passed
+- Business-logic coverage: 83.6%
+- Bugs found: 3 (1 critical pre-existing, 2 minor)
+
+### Bugs Fixed This Sprint
+- **BUG-I18N-001 (Critical)** — Blog handler used its own `contextKey` type to read auth context; middleware sets it with `middleware.contextKey`. Different named types never equal as Go context keys — all authenticated blog endpoints silently returned 401. Fixed: replaced all context reads with `middleware.UserIDFromContext()` / `middleware.RoleFromContext()`.
+- **BUG-I18N-002 (Minor)** — `GET /blogs/:id` response omitted `title_en`, `body_en`, `translation_status`. Fixed.
+- **BUG-I18N-003 (Minor)** — `PUT /users/me/language` handler existed but was not registered in the router. Fixed.
+
+### Key Decisions
+- Translation goroutine uses `context.Background()` — not bound to HTTP request lifetime (ADR-008)
+- `defer recover()` in goroutine prevents server crash on translation panic
+- Frontend i18n (react-i18next toggle) is **not** included — backend-only delta sprint
+- ADR-008: async translation. ADR-009: frontend i18n (planned, future sprint)
+
+### Next Sprint
+Frontend i18n (react-i18next language toggle, locale files, LanguageToggle component) — or as directed by Sprint Gate
+
+---
+
+## i18n-Bilingual Sprint — Frontend (Delta Feature)
+**Dates:** 2026-06-08
+**Status:** COMPLETE
+**Deploy tag:** `i18n-frontend-initial`
+
+### Completed Items
+| ID | Feature | Status |
+|----|---------|--------|
+| M-I18N-01 | LanguageToggle (VI/EN) in header — `aria-pressed`, localStorage via i18next detector | DONE |
+| M-I18N-02 | react-i18next setup — vi.json / en.json (18 keys each), all nav + blog strings use `t()` | DONE |
+| M-I18N-07 | BlogDetail shows `body_en` / `title_en` when language=EN and `translation_status=done` | DONE |
+| M-I18N-08 | BlogCard shows `title_en` when language=EN and translation done; fallback to VI | DONE |
+| M-I18N-09 | BlogDetail shows `[data-testid="translation-notice"]` when language=EN but status ≠ done | DONE |
+
+### Metrics
+- New tests: 13 (LanguageToggle: 5, BlogCard: 3, BlogDetail: 4, Login bug fix: 1)
+- Frontend tests total: 140 / 140 passed
+- Frontend coverage: 99.34% lines
+- TypeScript: 0 errors
+- Bugs found: 1 (pre-existing Login.test.tsx mock bug — fixed)
+
+### Bugs Fixed This Sprint
+- **BUG-I18N-FE-001 (Pre-existing)** — `Login.test.tsx` used `new Error('invalid')` as mock rejection. Plain Error has no `.response.status` → Login component fell into "Unable to connect" branch, not "Invalid email or password". Fixed: mock now uses `{ response: { status: 401 } }`.
+
+### Key Decisions
+- `i18next-browser-languagedetector` reads `localStorage` key `blog_engine_lang` → survives page reload
+- Default language: `'vi'` (fallbackLng). Browser navigator locale is second in detection order.
+- `body_en` in BlogDetail uses same `dangerouslySetInnerHTML` as original `content` — both sanitized by backend bluemonday; no new XSS surface
+- Frontend Docker container must be rebuilt (`docker compose up --build`) for changes to take effect in production
+
+### Next Sprint
+Sprint 4 — Mobile (React Native iOS + Android) — or as directed by Sprint Gate

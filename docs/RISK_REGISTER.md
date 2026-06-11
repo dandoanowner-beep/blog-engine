@@ -13,3 +13,16 @@
 | R-08 | Report abuse (users spamming reports) | Medium | Medium | One report per user per content item enforced at DB level. Rate limit report endpoint. |
 | R-09 | TDD coverage < 80% slows pipeline | Medium | Medium | Developer writes tests for every AC before implementation. QA blocks Gate 4 automatically. |
 | R-10 | Scope creep in Sprint 1 (too many features) | Medium | High | Strictly follow MoSCoW. Only M-01 to M-14 in Sprint 1. PM enforces scope at every gate. |
+
+---
+
+## i18n Sprint Risks (2026-06-07)
+
+| ID | Risk | Probability | Impact | Mitigation |
+|----|------|-------------|--------|------------|
+| R-I18N-01 | Claude API latency blocks blog publish response | Medium | High | Run translation in a goroutine after blog is saved — API response returns immediately; translation happens in background |
+| R-I18N-02 | Translation quality poor for specialized Vietnamese content | Low | Low | claude-sonnet-4-6 handles VI/EN well; author can re-save blog to trigger re-translation |
+| R-I18N-03 | UI strings missed — t() key falls back to raw key string (bad UX) | Medium | Medium | Systematically extract all strings before replacing; test that all keys exist in vi.json + en.json |
+| R-I18N-04 | Existing blogs have no English translation after migration | Certain | Low | Acceptable — fallback to VI content is specified in FRD FR-I18N-005; no backfill required |
+| R-I18N-05 | Claude API quota exceeded during testing / bulk blog creation | Low | Medium | Personal blog volume is very low; graceful failure (translation_status=failed) prevents data loss |
+| R-I18N-06 | react-i18next adds bundle size / complexity to frontend | Low | Low | Industry-standard library; tree-shaking keeps bundle impact minimal |

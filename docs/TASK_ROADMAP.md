@@ -76,3 +76,50 @@
 | Sprint 2 | Social Core | Follow, friends, reactions, comments, notifications, block, report |
 | Sprint 3 | Discovery + Admin | Search, profile, admin dashboard, sharing |
 | Sprint 4 | Mobile | React Native app |
+
+---
+
+## Delta Feature — i18n Bilingual Sprint (2026-06-07)
+
+### MoSCoW — i18n
+
+#### MUST HAVE
+| ID | Feature | Effort |
+|----|---------|--------|
+| M-I18N-01 | Language toggle (VI/EN) in header — localStorage, default VI | S |
+| M-I18N-02 | UI translation via react-i18next — vi.json + en.json for all text | L |
+| M-I18N-03 | DB migration: title_en, body_en, translation_status on blogs | S |
+| M-I18N-04 | Translation service (Go) — Claude API claude-sonnet-4-6 VI→EN | M |
+| M-I18N-05 | Auto-translate on blog create (async, non-blocking) | S |
+| M-I18N-06 | Auto-re-translate on blog edit (title/body changed) | S |
+| M-I18N-07 | Blog detail: show EN content when available, fallback to VI | S |
+| M-I18N-08 | Blog cards: show EN title/excerpt when available | S |
+| M-I18N-09 | "Translation unavailable" notice + graceful VI fallback | S |
+
+#### SHOULD HAVE
+| ID | Feature | Effort |
+|----|---------|--------|
+| S-I18N-01 | Language preference synced to user profile in DB | M |
+
+#### COULD HAVE
+| ID | Feature | Effort |
+|----|---------|--------|
+| C-I18N-01 | Translation status badge on author's blog list | S |
+
+#### WON'T HAVE (this sprint)
+| ID | Feature | Reason |
+|----|---------|--------|
+| W-I18N-01 | Auto-detect browser language | Not requested; default VI is sufficient |
+| W-I18N-02 | Additional languages | Out of scope by design decision |
+| W-I18N-03 | Comment / bio / quote translation | Deferred — see DESIGN_DECISIONS.md Round 6 |
+| W-I18N-04 | Manual correction of auto-translations | Could Have in a future sprint |
+
+### Sprint Sequence
+```
+i18n Sprint:
+  developer (backend: migration + translation service + wire-up)
+    → developer (frontend: react-i18next setup + locale files + components)
+      → reviewer → GATE 3
+        → qa → GATE 4
+          → sprint-review → devops → sprint-gate
+```

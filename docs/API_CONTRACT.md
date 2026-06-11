@@ -79,13 +79,54 @@ Auth: required (author or moderator+)
 Response 204: no content
 Response 403: `{ error: "Forbidden" }`
 
-### GET /blogs/feed/explore?page=&tag=&category=
-Auth: optional
-Response 200: `{ blogs: [BlogCard], total, page, per_page: 12 }`
+### GET /blogs/feed?page=&category=
+Auth: optional (token validated when present; invalid token → 401)
+`category` (optional, CR-002): category slug — filters to blogs in that category
+Response 200: `{ blogs: [BlogCard], total, page, per_page: 9 }`
+BlogCard: `{ id, title, excerpt, thumbnail_url, author: { id, username, avatar_url }, read_time_min, tags: [{ id, name, slug }], like_count, dislike_count, comment_count, privacy, published_at, title_en, translation_status }`
 
-### GET /blogs/feed/following?page=
-Auth: required
-Response 200: `{ blogs: [BlogCard], total, page, per_page: 12 }`
+> CR-001 (2026-06-10): replaces `GET /blogs/feed/explore` and `GET /blogs/feed/following`
+> (personal-blog pivot — single article feed). CR-002 (2026-06-11) restored the
+> `category` filter.
+
+---
+
+## CR-002 — Portfolio / Author / Categories (2026-06-11)
+
+### GET /categories
+Auth: none (public)
+Response 200: `{ categories: [{ id, name, slug, blog_count }] }` — `blog_count` counts published public blogs.
+
+### GET /projects
+Auth: none (public)
+Response 200: `{ projects: [{ id, title, description, tech_stack, repo_url, demo_url, thumbnail_url, sort_order, created_at, updated_at }] }`
+
+### POST /projects
+Auth: required — role `owner` only (routing-level RBAC)
+Request: `{ title, description?, tech_stack?, repo_url?, demo_url?, thumbnail_url?, sort_order? }`
+Response 201: `{ project }` · 422 if title missing
+
+### PATCH /projects/:id
+Auth: required — role `owner` only
+Request: any subset of the POST fields
+Response 200: `{ project }` · 404 if not found · 422 if title blanked
+
+### DELETE /projects/:id
+Auth: required — role `owner` only
+Response 204
+
+### GET /about
+Auth: none (public)
+Response 200: `{ content }` — sanitized HTML; empty string if not written yet
+
+### PUT /about
+Auth: required — role `owner` only
+Request: `{ content }` (HTML — sanitized server-side)
+Response 200: `{ status: "saved" }`
+
+### Blog create/update change (CR-002)
+`POST /blogs` and `PATCH /blogs/:id` now take `category_names: [string]` instead of
+`category_ids` — categories are upserted by name like tags and associated to the blog.
 
 ---
 
@@ -327,3 +368,51 @@ Response 200:
   "created_at": "ISO8601"
 }
 ```
+
+---
+
+## i18n Delta Changes (2026-06-07)
+
+### Modified: Blog Object (all blog endpoints)
+
+All endpoints that return a blog object or blog card now include these additional fields:
+
+```json
+{
+  "id": "uuid",
+  "title": "Tiêu đề blog (VI)",
+  "content": "...(VI body)...",
+  "excerpt": "...(VI excerpt)...",
+  "title_en": "Blog Title (EN)",
+  "body_en": "...(EN body)...",
+  "translation_status": "done",
+  ...existing fields unchanged...
+}
+```
+
+`title_en` and `body_en` are `null` when `translation_status` is `none`, `pending`, or `failed`.
+
+Affected endpoints:
+- `POST /blogs` — response includes new fields
+- `GET /blogs/:id` — response includes new fields
+- `PATCH /blogs/:id` — response includes new fields
+- `GET /blogs/feed` — BlogCard objects include `title_en`, `translation_status` (was `feed/explore` + `feed/following`; consolidated by CR-001)
+- `GET /search` — blog results include `title_en`, `translation_status`
+
+### New: Language Preference
+
+#### PUT /users/me/language
+Auth: required
+Request: `{ "language": "vi" | "en" }`
+Response 200: `{ "language": "vi" | "en" }`
+Response 400: `{ "error": "Invalid language. Supported: vi, en" }`
+
+Purpose: Saves logged-in user's language preference to DB for cross-device sync. Guests use localStorage only (no API call needed).
+
+### Translation Status Values
+| Value | Meaning |
+|-------|---------|
+| `none` | Blog created before i18n feature or translation not yet triggered |
+| `pending` | Translation in progress (goroutine running) |
+| `done` | English translation available in `title_en` / `body_en` |
+| `failed` | Translation attempted but Claude API call failed; will show VI fallback |

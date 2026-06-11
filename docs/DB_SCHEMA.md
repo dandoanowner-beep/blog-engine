@@ -253,3 +253,42 @@ CREATE TABLE reports (
     )
 );
 ```
+
+---
+
+## Migration 002 — i18n Bilingual (2026-06-07)
+
+```sql
+-- migrations/002_i18n.sql
+
+-- Add bilingual content columns to blogs
+ALTER TABLE blogs
+  ADD COLUMN title_en          TEXT,
+  ADD COLUMN body_en           TEXT,
+  ADD COLUMN translation_status VARCHAR(20) NOT NULL DEFAULT 'none';
+-- translation_status values: 'none' | 'pending' | 'done' | 'failed'
+
+-- Index for efficient filtering by translation status (e.g. find untranslated blogs)
+CREATE INDEX idx_blogs_translation_status ON blogs(translation_status)
+  WHERE translation_status IN ('pending', 'failed');
+
+-- Add language preference to users (for cross-device sync — Should Have)
+ALTER TABLE users
+  ADD COLUMN language_preference VARCHAR(5) NOT NULL DEFAULT 'vi';
+-- language_preference values: 'vi' | 'en'
+```
+
+### Updated blogs table (i18n columns added)
+| Column | Type | Notes |
+|--------|------|-------|
+| title | VARCHAR(500) | Vietnamese title (primary — existing) |
+| content | TEXT | Vietnamese body — sanitized HTML (existing) |
+| excerpt | VARCHAR(300) | Vietnamese excerpt (existing) |
+| **title_en** | TEXT | English title — NULL until translated |
+| **body_en** | TEXT | English body — NULL until translated |
+| **translation_status** | VARCHAR(20) | `none` \| `pending` \| `done` \| `failed` |
+
+### Updated users table (i18n column added)
+| Column | Type | Notes |
+|--------|------|-------|
+| **language_preference** | VARCHAR(5) | `vi` (default) or `en` — saved on toggle for logged-in users |

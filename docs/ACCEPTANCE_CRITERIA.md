@@ -184,3 +184,45 @@
 - [ ] Reports queue lists all unresolved reports with: content preview, reason, reporter username, timestamp
 - [ ] Admin/Owner can delete reported content directly from queue
 - [ ] Platform stats visible: total users, total blogs, total comments, new signups this week
+
+---
+
+## AC-I18N-001: Language Toggle
+- [ ] Language toggle button visible in header on every page
+- [ ] Clicking toggle switches between VI and EN
+- [ ] Default language for all new visitors is Vietnamese
+- [ ] Selected language persisted in `localStorage`
+- [ ] Toggle visually indicates current active language (e.g. "VI" / "EN" label)
+
+## AC-I18N-002: UI Text Translation
+- [ ] All navigation labels translated (Explore, Sign in, Get started, Logout, Admin)
+- [ ] All form labels and placeholders translated
+- [ ] All button text translated (Publish, Save Draft, Edit, Delete, Follow, Unfollow, Like, Comment, Share, Report, etc.)
+- [ ] All error messages and validation text translated
+- [ ] All empty-state messages translated
+- [ ] Switching language re-renders all UI text without page reload
+
+## AC-I18N-003: Blog Content Storage
+- [ ] DB migration adds `title_en TEXT`, `body_en TEXT`, `translation_status VARCHAR` columns to `blogs` table
+- [ ] `translation_status` values: `none`, `pending`, `done`, `failed`
+- [ ] Existing blogs have `translation_status = none` after migration
+
+## AC-I18N-004: Auto-Translation Trigger
+- [ ] When a blog is created, translation is triggered immediately after save
+- [ ] When a blog is updated (title or body changed), translation is re-triggered
+- [ ] Translation calls Claude API with the Vietnamese title + body
+- [ ] On success: `title_en` and `body_en` are stored; `translation_status = done`
+- [ ] On API failure: blog is still saved; `translation_status = failed`; no error shown to user
+
+## AC-I18N-005: Blog Display — Language Switching
+- [ ] Blog detail page shows `title_en` / `body_en` when language = EN and `translation_status = done`
+- [ ] Blog detail page shows `title_vi` / `body_vi` when language = VI
+- [ ] If language = EN but `translation_status != done`: show Vietnamese content
+- [ ] If language = EN but translation unavailable: display notice "English translation unavailable — showing Vietnamese"
+- [ ] Blog cards in feed show English title/excerpt when language = EN and translation available
+- [ ] Blog cards fall back to Vietnamese if translation unavailable
+
+## AC-I18N-006: Scope Boundaries
+- [ ] Comments are NOT translated (display as written)
+- [ ] User bio and favorite quote are NOT translated
+- [ ] No languages other than VI and EN are supported

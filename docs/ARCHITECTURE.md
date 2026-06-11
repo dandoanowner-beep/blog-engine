@@ -254,3 +254,121 @@ Key design decisions:
 | Migrations | Numbered SQL files in `migrations/`, applied on startup |
 | Config | All config via environment variables, no hardcoded values |
 | Logging | Structured JSON logs to stdout (level: info/warn/error) |
+
+---
+
+## 9. i18n Architecture — Bilingual VI/EN (Delta — 2026-06-07)
+
+### 9.1 Overview
+
+Two-layer i18n:
+- **Layer 1 — UI text**: `react-i18next` on the frontend. All static strings resolved from locale JSON files at runtime. Language stored in `localStorage`.
+- **Layer 2 — Blog content**: Bilingual columns on the `blogs` table (`title_en`, `body_en`). Auto-populated via Claude API at write time. Displayed based on reader's language preference.
+
+### 9.2 Translation Service (Backend)
+
+New package: `internal/translation/`
+
+```
+internal/translation/
+├── service.go      ← Translator interface + ClaudeTranslator implementation
+└── service_test.go ← unit tests (mock HTTP transport)
+```
+
+**Interface**:
+```go
+type Translator interface {
+    Translate(ctx context.Context, titleVI, bodyVI string) (titleEN, bodyEN string, err error)
+}
+```
+
+**Flow — blog create**:
+```
+POST /blogs
+  → blog saved to DB (translation_status = 'pending')
+  → HTTP 201 returned to client immediately
+  → goroutine launched: translateAndUpdate(blogID, titleVI, bodyVI)
+      → ClaudeTranslator.Translate() → POST api.anthropic.com/v1/messages
+      → on success: UPDATE blogs SET title_en=?, body_en=?, translation_status='done'
+      → on failure: UPDATE blogs SET translation_status='failed'; log error
+```
+
+**Flow — blog edit** (only if title or body changed):
+```
+PATCH /blogs/:id
+  → detect if req.Title != existing.Title || req.Content != existing.Content
+  → save update to DB (translation_status = 'pending')
+  → HTTP 200 returned immediately
+  → goroutine: re-translate and update title_en, body_en
+```
+
+**Claude API prompt** (claude-sonnet-4-6):
+```
+System: You are a professional Vietnamese-to-English translator.
+User: Translate this blog post from Vietnamese to English.
+      Return ONLY a JSON object with exactly two fields: "title" and "body".
+      Do not include any other text or explanation.
+
+      Title: <title_vi>
+      Body: <body_vi>
+```
+
+**Config** (new env vars):
+```
+ANTHROPIC_API_KEY=sk-ant-...
+TRANSLATION_MODEL=claude-sonnet-4-6
+```
+
+### 9.3 Frontend i18n Architecture
+
+**Library**: `react-i18next` + `i18next`
+
+**Locale files**:
+```
+src/
+  i18n.ts              ← i18next init: language detection from localStorage, fallback 'vi'
+  locales/
+    vi.json            ← all UI strings in Vietnamese (primary/default)
+    en.json            ← all UI strings in English
+```
+
+**Language detection chain** (i18next `languageDetector`):
+1. Check `localStorage['i18nextLng']`
+2. Default to `'vi'`
+
+**LanguageToggle component** (`src/components/LanguageToggle.tsx`):
+- Renders `VI | EN` button pair in header
+- Calls `i18n.changeLanguage(lang)` — i18next persists to localStorage automatically
+
+**Blog content language selection**:
+```typescript
+// In BlogCard and BlogDetail
+const { i18n } = useTranslation()
+const showEN = i18n.language === 'en' && blog.translation_status === 'done'
+const displayTitle   = showEN ? blog.title_en   : blog.title
+const displayContent = showEN ? blog.body_en    : blog.content
+```
+
+**Unavailable notice** (renders only when `language === 'en'` and `translation_status !== 'done'`):
+```tsx
+{i18n.language === 'en' && blog.translation_status !== 'done' && (
+  <p className="text-xs text-amber-600">{t('blog.translationUnavailable')}</p>
+)}
+```
+
+### 9.4 Updated Package Structure (delta additions only)
+
+```
+internal/
+  translation/         ← NEW: Claude API translation service
+    service.go
+    service_test.go
+
+src/ (frontend)
+  i18n.ts              ← NEW: i18next config
+  locales/
+    vi.json            ← NEW: Vietnamese UI strings
+    en.json            ← NEW: English UI strings
+  components/
+    LanguageToggle.tsx ← NEW: VI/EN toggle button
+```

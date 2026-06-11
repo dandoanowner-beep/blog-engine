@@ -1,5 +1,5 @@
 # Rollback Procedure — Blog Engine
-# Last updated: 2026-05-31 | DevOps Agent (frontend sprint)
+# Last updated: 2026-06-08 | DevOps Agent (i18n-backend sprint)
 
 ---
 
@@ -84,6 +84,27 @@ Migrations are **additive only** (no destructive ALTER/DROP in any sprint). If a
 
 If data corruption is suspected, restore from the last automated backup using PostgreSQL point-in-time recovery to before the deploy timestamp.
 
+### i18n Migration (`002_i18n.sql`) — Rollback Notes
+
+`002_i18n.sql` adds four nullable columns and one index — it is fully backward-compatible:
+- `blogs.title_en` (TEXT, nullable)
+- `blogs.body_en` (TEXT, nullable)
+- `blogs.translation_status` (VARCHAR 20, NOT NULL DEFAULT 'none')
+- `users.language_preference` (VARCHAR 5, NOT NULL DEFAULT 'vi')
+
+If rollback to the pre-i18n API image is required while keeping the migration applied, the old binary will ignore unknown columns — no issue. If the migration must be reversed (unlikely):
+
+```sql
+-- ONLY if a full DB reset is needed — data in these columns will be lost
+ALTER TABLE blogs DROP COLUMN IF EXISTS title_en;
+ALTER TABLE blogs DROP COLUMN IF EXISTS body_en;
+ALTER TABLE blogs DROP COLUMN IF EXISTS translation_status;
+DROP INDEX IF EXISTS idx_blogs_translation_status;
+ALTER TABLE users DROP COLUMN IF EXISTS language_preference;
+```
+
+**Important:** removing `translation_status` from a live DB will break the i18n-capable API binary. Only run the above after confirming the deployed image is pre-i18n.
+
 ---
 
 ## Emergency: Full Stack Rollback
@@ -105,3 +126,5 @@ terraform apply \
 |--------|---------|--------------|------|
 | Sprint 1 (API) | wireup-initial | — | 2026-05-30 |
 | Frontend sprint | wireup-initial | frontend-initial | 2026-05-31 |
+| i18n-backend delta | i18n-backend-initial | frontend-initial (unchanged) | 2026-06-08 |
+| i18n-frontend delta | i18n-backend-initial (unchanged) | i18n-frontend-initial | 2026-06-08 |

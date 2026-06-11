@@ -445,3 +445,89 @@ Feature: Admin Dashboard
     Then the blog is permanently removed
     And the report is marked as resolved
 ```
+
+---
+
+## Epic 7: Internationalization (i18n) — VI/EN
+# Delta Feature — 2026-06-07
+
+### US-019: Language Toggle
+```gherkin
+Feature: Language Toggle
+  As a blog visitor
+  I want to switch between Vietnamese and English
+  So that I can read the site in my preferred language
+
+  Scenario: Default language is Vietnamese
+    Given I visit the blog for the first time
+    Then the interface is displayed in Vietnamese
+
+  Scenario: Switch to English
+    Given the current language is Vietnamese
+    When I click the language toggle in the header
+    Then all UI text switches to English
+    And the toggle shows "EN" as active
+
+  Scenario: Language preference persists
+    Given I previously selected English
+    When I return to the blog in a new browser session
+    Then the blog loads in English
+```
+
+### US-020: Read Blog in Preferred Language
+```gherkin
+Feature: Blog Content Language
+  As a blog reader
+  I want to read blog posts in my selected language
+  So that I can understand the content
+
+  Scenario: Read blog in English
+    Given the language is set to English
+    And a blog post has an English translation
+    When I open the blog detail page
+    Then I see the title and full body in English
+
+  Scenario: Read blog in Vietnamese
+    Given the language is set to Vietnamese
+    When I open the blog detail page
+    Then I see the title and full body in Vietnamese
+
+  Scenario: English translation unavailable
+    Given the language is set to English
+    And a blog post has no English translation
+    When I open the blog detail page
+    Then I see the Vietnamese content
+    And a notice "English translation unavailable" is shown
+
+  Scenario: Blog cards in feed show correct language
+    Given the language is set to English
+    When I browse the Explore or Following feed
+    Then each blog card shows its English title and excerpt
+```
+
+### US-021: Auto-Translate on Publish
+```gherkin
+Feature: Auto-Translation
+  As the blog author
+  I want my Vietnamese blog posts to be automatically translated to English
+  So that English readers can access my content without extra effort from me
+
+  Scenario: Blog translated on publish
+    Given I write a blog post in Vietnamese
+    When I publish the blog
+    Then the system automatically translates the title and body to English
+    And the English version is stored and available to readers
+
+  Scenario: Blog translated on update
+    Given I edit the Vietnamese content of a published blog
+    When I save the changes
+    Then the English translation is regenerated
+    And the new English version replaces the old one
+
+  Scenario: Translation failure — blog still published
+    Given I publish a blog post
+    And the translation service is temporarily unavailable
+    Then the blog is still published successfully in Vietnamese
+    And the translation status is marked as failed
+    And readers see Vietnamese content with a fallback notice
+```
