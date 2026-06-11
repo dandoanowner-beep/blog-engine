@@ -43,9 +43,30 @@ describe('Layout component', () => {
     expect(screen.getByRole('link', { name: /get started/i })).toBeInTheDocument()
   })
 
-  it('shows Write button for authenticated users', () => {
-    wrap({ id: '1', username: 'alice', role: 'user', avatar_url: null })
+  // CR-001 personal-blog pivot: only the owner writes
+  it('shows Write button for the owner', () => {
+    wrap({ id: '1', username: 'chubeunu', role: 'owner', avatar_url: null })
     expect(screen.getByRole('link', { name: /write/i })).toBeInTheDocument()
+  })
+
+  it('does NOT show Write button for regular users', () => {
+    wrap({ id: '1', username: 'alice', role: 'user', avatar_url: null })
+    expect(screen.queryByRole('link', { name: /write/i })).not.toBeInTheDocument()
+  })
+
+  it('shows the Articles nav link instead of Explore', () => {
+    wrap(null)
+    expect(screen.getByRole('link', { name: /articles/i })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /explore/i })).not.toBeInTheDocument()
+  })
+
+  // CR-002: four new header sections, visible to everyone
+  it('shows Portfolio, Author, Categories and Forums nav links', () => {
+    wrap(null)
+    expect(screen.getByRole('link', { name: /portfolio/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /author/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /categories/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /forums/i })).toBeInTheDocument()
   })
 
   it('shows Admin link for admin users', () => {

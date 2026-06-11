@@ -11,6 +11,10 @@ import Editor from './pages/Editor'
 import Profile from './pages/Profile'
 import Search from './pages/Search'
 import Admin from './pages/Admin'
+import Portfolio from './pages/Portfolio'
+import Author from './pages/Author'
+import Categories from './pages/Categories'
+import Forum from './pages/Forum'
 
 function AppShell() {
   return (
@@ -27,6 +31,10 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Feed /> },
       { path: 'blog/:id', element: <BlogDetail /> },
+      { path: 'portfolio', element: <Portfolio /> },
+      { path: 'author', element: <Author /> },
+      { path: 'categories', element: <Categories /> },
+      { path: 'forum', element: <Forum /> },
       { path: 'search', element: <Search /> },
       { path: 'profile/:username', element: <Profile /> },
       {

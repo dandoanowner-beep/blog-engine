@@ -1,10 +1,13 @@
 import type { ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../store/auth'
 import NotificationBell from './NotificationBell'
+import LanguageToggle from './LanguageToggle'
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuthStore()
+  const { t } = useTranslation()
   const navigate = useNavigate()
 
   const handleLogout = async () => {
@@ -19,14 +22,25 @@ export default function Layout({ children }: { children: ReactNode }) {
           <Link to="/" className="font-bold text-lg text-blue-600">BlogEngine</Link>
 
           <nav className="flex items-center gap-4">
-            <Link to="/" className="text-sm text-gray-600 hover:text-blue-600">Explore</Link>
-            <Link to="/search" className="text-sm text-gray-600 hover:text-blue-600">Search</Link>
+            {/* page links: 40px between each link, and 40px before the language toggle
+                (nav gap-4 = 16px, so mr-[24px] tops it up to 40px) */}
+            <div className="flex items-center gap-[40px] mr-[24px]">
+              <Link to="/" className="text-sm font-bold text-gray-600 hover:text-blue-600">{t('nav.articles')}</Link>
+              <Link to="/portfolio" className="text-sm font-bold text-gray-600 hover:text-blue-600">{t('nav.portfolio')}</Link>
+              <Link to="/author" className="text-sm font-bold text-gray-600 hover:text-blue-600">{t('nav.author')}</Link>
+              <Link to="/categories" className="text-sm font-bold text-gray-600 hover:text-blue-600">{t('nav.categories')}</Link>
+              <Link to="/forum" className="text-sm font-bold text-gray-600 hover:text-blue-600">{t('nav.forums')}</Link>
+            </div>
+
+            <LanguageToggle />
 
             {user ? (
               <>
-                <Link to="/editor" className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
-                  Write
-                </Link>
+                {user.role === 'owner' && (
+                  <Link to="/editor" className="text-sm text-gray-600 hover:text-blue-600">
+                    {t('nav.write')}
+                  </Link>
+                )}
                 <NotificationBell />
                 <Link to={`/profile/${user.username}`} className="flex items-center gap-1">
                   {user.avatar_url
@@ -37,17 +51,17 @@ export default function Layout({ children }: { children: ReactNode }) {
                   }
                 </Link>
                 {(user.role === 'admin' || user.role === 'owner') && (
-                  <Link to="/admin" className="text-xs text-gray-500 hover:text-blue-600">Admin</Link>
+                  <Link to="/admin" className="text-xs text-gray-500 hover:text-blue-600">{t('nav.admin')}</Link>
                 )}
                 <button onClick={handleLogout} className="text-sm text-gray-500 hover:text-red-500">
-                  Logout
+                  {t('nav.logout')}
                 </button>
               </>
             ) : (
               <>
-                <Link to="/auth/login" className="text-sm text-gray-600 hover:text-blue-600">Sign in</Link>
+                <Link to="/auth/login" className="text-sm text-gray-600 hover:text-blue-600">{t('nav.signIn')}</Link>
                 <Link to="/auth/register" className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
-                  Get started
+                  {t('nav.getStarted')}
                 </Link>
               </>
             )}

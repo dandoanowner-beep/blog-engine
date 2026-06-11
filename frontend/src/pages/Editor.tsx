@@ -23,6 +23,7 @@ export default function Editor() {
   const [title, setTitle] = useState('')
   const [privacy, setPrivacy] = useState<CreateBlogInput['privacy']>('public')
   const [tags, setTags] = useState('')
+  const [categories, setCategories] = useState('')
   const [thumbnail, setThumbnail] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -76,7 +77,7 @@ export default function Editor() {
       privacy,
       status,
       tag_names: tags.split(',').map((t) => t.trim()).filter(Boolean),
-      category_ids: [],
+      category_names: categories.split(',').map((c) => c.trim()).filter(Boolean),
       ...(thumbnail ? { thumbnail_url: thumbnail } : {}),
     }
     try {
@@ -132,6 +133,16 @@ export default function Editor() {
               onChange={(e) => setTags(e.target.value)}
               placeholder="react, typescript, webdev"
               className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Categories (comma-separated)</label>
+            <input
+              value={categories}
+              onChange={(e) => setCategories(e.target.value)}
+              placeholder="Tutorials, Travel"
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              data-testid="categories-input"
             />
           </div>
           <div>
