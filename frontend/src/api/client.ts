@@ -30,6 +30,7 @@ api.interceptors.response.use(
         return api(err.config)
       } catch {
         tokenStore.clear()
+        localStorage.removeItem('blog_engine_user') // BUG-009: stale persisted session
         window.location.href = '/auth/login'
       }
     }

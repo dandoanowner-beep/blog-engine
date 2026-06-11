@@ -8,15 +8,18 @@ import (
 	"time"
 
 	"blog-engine/config"
+	"blog-engine/internal/admin"
 	"blog-engine/internal/auth"
 	"blog-engine/internal/blog"
 	"blog-engine/internal/middleware"
 	"blog-engine/internal/notification"
+	"blog-engine/internal/portfolio"
 	"blog-engine/internal/search"
+	"blog-engine/internal/site"
 	"blog-engine/internal/social"
+	"blog-engine/internal/translation"
 	"blog-engine/internal/upload"
 	"blog-engine/internal/user"
-	"blog-engine/internal/admin"
 	"blog-engine/pkg/database"
 	"blog-engine/pkg/email"
 	"blog-engine/pkg/sanitize"
@@ -56,7 +59,11 @@ func main() {
 	// Services
 	authSvc    := auth.NewService(authRepo, emailSvc, cfg.JWTSecret, cfg.JWTRefreshSecret, cfg.AppURL)
 	blogRepo   := blog.NewPostgresRepository(db)
-	blogSvc    := blog.NewService(blogRepo, sanitizer)
+	var translator blog.Translator
+	if apiKey := os.Getenv("ANTHROPIC_API_KEY"); apiKey != "" {
+		translator = translation.NewClaudeTranslator(apiKey)
+	}
+	blogSvc    := blog.NewService(blogRepo, sanitizer, translator)
 	uploadSvc  := upload.NewService(r2Client, cfg.R2PublicURL)
 	notifRepo  := notification.NewPostgresRepository(db)
 	notifSvc   := notification.NewService(notifRepo)
@@ -68,6 +75,10 @@ func main() {
 	userSvc    := user.NewService(userRepo)
 	adminRepo  := admin.NewPostgresRepository(db)
 	adminSvc   := admin.NewService(adminRepo)
+	portRepo   := portfolio.NewPostgresRepository(db)
+	portSvc    := portfolio.NewService(portRepo, sanitizer)
+	siteRepo   := site.NewPostgresRepository(db)
+	siteSvc    := site.NewService(siteRepo, sanitizer)
 
 	// Handlers
 	authH   := auth.NewHandler(authSvc)
@@ -78,6 +89,8 @@ func main() {
 	searchH := search.NewHandler(searchSvc)
 	userH   := user.NewHandler(userSvc)
 	adminH  := admin.NewHandler(adminSvc)
+	portH   := portfolio.NewHandler(portSvc)
+	siteH   := site.NewHandler(siteSvc)
 
 	// Middleware
 	authMw := middleware.NewAuth(jwtUtil)
@@ -100,18 +113,26 @@ func main() {
 		r.Get("/auth/verify", authH.VerifyEmail)
 		r.Post("/auth/forgot-password", authH.ForgotPassword)
 		r.Post("/auth/reset-password", authH.ResetPassword)
+		r.Post("/auth/refresh", authH.Refresh)
 		r.Post("/auth/logout", authH.Logout)
 
-		// Blogs (public read)
-		r.Get("/blogs/feed/explore", blogH.ExploreFeed)
-		r.Get("/blogs/{id}", blogH.GetBlog)
+		// Blogs (public read — guests allowed; a presented token is validated
+		// at the routing level and rejected with 401 if invalid)
+		r.Group(func(r chi.Router) {
+			r.Use(authMw.OptionalAuthenticate)
+			r.Get("/blogs/feed", blogH.ArticlesFeed)
+			r.Get("/blogs/{id}", blogH.GetBlog)
+		})
+
+		// CR-002 public pages
+		r.Get("/categories", blogH.ListCategories)
+		r.Get("/projects", portH.ListProjects)
+		r.Get("/about", siteH.GetAbout)
 
 		// Authenticated routes
 		r.Group(func(r chi.Router) {
 			r.Use(authMw.Authenticate)
 
-			r.Get("/blogs/feed/following", blogH.FollowingFeed)
-			r.Post("/blogs", blogH.CreateBlog)
 			r.Patch("/blogs/{id}", blogH.UpdateBlog)
 			r.Delete("/blogs/{id}", blogH.DeleteBlog)
 
@@ -121,6 +142,7 @@ func main() {
 
 			r.Get("/users/{username}", userH.GetProfile)
 			r.Patch("/users/me", userH.UpdateProfile)
+				r.Put("/users/me/language", userH.UpdateLanguagePreference)
 
 			r.Post("/users/{id}/follow", socialH.Follow)
 			r.Delete("/users/{id}/follow", socialH.Unfollow)
@@ -140,6 +162,18 @@ func main() {
 			r.Get("/notifications", notifH.List)
 			r.Patch("/notifications/{id}/read", notifH.MarkRead)
 			r.Patch("/notifications/read-all", notifH.MarkAllRead)
+		})
+
+		// Owner-only routes (CR-001 personal-blog pivot: only the owner writes)
+		r.Group(func(r chi.Router) {
+			r.Use(authMw.Authenticate)
+			r.Use(rbacMw.RequireRole("owner"))
+			r.Post("/blogs", blogH.CreateBlog)
+			// CR-002: portfolio + author page management
+			r.Post("/projects", portH.CreateProject)
+			r.Patch("/projects/{id}", portH.UpdateProject)
+			r.Delete("/projects/{id}", portH.DeleteProject)
+			r.Put("/about", siteH.UpdateAbout)
 		})
 
 		// Moderator+ routes

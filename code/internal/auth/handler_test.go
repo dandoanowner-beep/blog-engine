@@ -245,3 +245,47 @@ func TestHealthHandler_Returns200(t *testing.T) {
 
 // ensure unused import doesn't break
 var _ = time.Now
+
+// --- BUG-009: POST /auth/refresh (session survival across reloads) ---
+
+func TestRefreshHandler_ValidCookie_ReturnsNewAccessToken(t *testing.T) {
+	svc := &mockAuthService{}
+	h := auth.NewHandler(svc)
+
+	svc.On("RefreshToken", mock.Anything, "refresh.tok.en").Return("new.access.token", nil)
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/refresh", nil)
+	req.AddCookie(&http.Cookie{Name: "refresh_token", Value: "refresh.tok.en"})
+	rec := httptest.NewRecorder()
+	h.Refresh(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	var resp map[string]string
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.Equal(t, "new.access.token", resp["access_token"])
+}
+
+func TestRefreshHandler_MissingCookie_Returns401(t *testing.T) {
+	svc := &mockAuthService{}
+	h := auth.NewHandler(svc)
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/refresh", nil)
+	rec := httptest.NewRecorder()
+	h.Refresh(rec, req)
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+func TestRefreshHandler_InvalidToken_Returns401(t *testing.T) {
+	svc := &mockAuthService{}
+	h := auth.NewHandler(svc)
+
+	svc.On("RefreshToken", mock.Anything, "bad-token").Return("", auth.ErrTokenInvalid)
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/refresh", nil)
+	req.AddCookie(&http.Cookie{Name: "refresh_token", Value: "bad-token"})
+	rec := httptest.NewRecorder()
+	h.Refresh(rec, req)
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}

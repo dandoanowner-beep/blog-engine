@@ -76,4 +76,40 @@ describe('useAuthStore', () => {
     await expect(useAuthStore.getState().register('a@b.com', 'alice', 'pass')).rejects.toThrow('email already taken')
     expect(useAuthStore.getState().loading).toBe(false)
   })
+
+  // --- BUG-009: session survives page reload (user persisted, token stays in memory) ---
+
+  it('login: persists user to localStorage', async () => {
+    const mockUser = { id: '1', username: 'chubeunu', role: 'owner' as const, verified: true }
+    vi.mocked(authApi.login).mockResolvedValue({ access_token: 'tok', user: mockUser })
+
+    await useAuthStore.getState().login('a@b.com', 'pass')
+
+    expect(JSON.parse(localStorage.getItem('blog_engine_user') ?? 'null')).toEqual(mockUser)
+  })
+
+  it('logout: removes persisted user from localStorage', async () => {
+    localStorage.setItem('blog_engine_user', JSON.stringify({ id: '1', username: 'x', role: 'user', verified: true }))
+    vi.mocked(authApi.logout).mockResolvedValue(undefined)
+
+    await useAuthStore.getState().logout()
+
+    expect(localStorage.getItem('blog_engine_user')).toBeNull()
+  })
+
+  it('setUser(null): removes persisted user', () => {
+    localStorage.setItem('blog_engine_user', JSON.stringify({ id: '1', username: 'x', role: 'user', verified: true }))
+    useAuthStore.getState().setUser(null)
+    expect(localStorage.getItem('blog_engine_user')).toBeNull()
+  })
+
+  it('loadPersistedUser: returns the stored user, null on garbage', async () => {
+    const { loadPersistedUser } = await import('../store/auth')
+    const u = { id: '9', username: 'chubeunu', role: 'owner', verified: true }
+    localStorage.setItem('blog_engine_user', JSON.stringify(u))
+    expect(loadPersistedUser()).toEqual(u)
+
+    localStorage.setItem('blog_engine_user', '{not json')
+    expect(loadPersistedUser()).toBeNull()
+  })
 })
