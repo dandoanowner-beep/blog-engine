@@ -6,6 +6,7 @@ import (
 
 	"blog-engine/internal/middleware"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 type Handler struct{ svc *Service }
@@ -43,6 +44,31 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"user": updated})
+}
+
+func (h *Handler) UpdateLanguagePreference(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.UserIDFromContext(r.Context())
+	if userID == uuid.Nil {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var req struct {
+		Language string `json:"language"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid body")
+		return
+	}
+	if err := h.svc.UpdateLanguagePreference(r.Context(), userID, req.Language); err != nil {
+		switch err {
+		case ErrInvalidLanguage:
+			writeError(w, http.StatusBadRequest, err.Error())
+		default:
+			writeError(w, http.StatusInternalServerError, "update failed")
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"language": req.Language})
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {

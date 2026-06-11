@@ -1,0 +1,28 @@
+{
+  "nav": {
+    "articles": "Bài viết",
+    "portfolio": "Dự án",
+    "author": "Tác giả",
+    "categories": "Danh mục",
+    "forums": "Diễn đàn",
+    "write": "Viết bài",
+    "signIn": "Đăng nhập",
+    "getStarted": "Bắt đầu",
+    "logout": "Đăng xuất",
+    "admin": "Quản trị"
+  },
+  "blog": {
+    "minRead": "phút đọc",
+    "signInToReadMore": "Đăng nhập để đọc thêm →",
+    "postNotFound": "Không tìm thấy bài viết.",
+    "copyLink": "Sao chép liên kết",
+    "delete": "Xóa",
+    "deleteConfirm": "Xóa bài viết này?",
+    "edit": "Chỉnh sửa",
+    "commentsLabel": "Bình luận",
+    "commentPlaceholder": "Thêm bình luận…",
+    "post": "Đăng",
+    "translationUnavailable": "Không có bản dịch",
+    "translationNotice": "Hiển thị nội dung tiếng Việt gốc."
+  }
+}

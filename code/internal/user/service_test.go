@@ -45,6 +45,9 @@ func (m *mockRepo) IsFriend(ctx context.Context, viewerID, profileID uuid.UUID) 
 	args := m.Called(ctx, viewerID, profileID)
 	return args.Bool(0), args.Error(1)
 }
+func (m *mockRepo) UpdateLanguagePreference(ctx context.Context, userID uuid.UUID, lang string) error {
+	return m.Called(ctx, userID, lang).Error(0)
+}
 
 // ════════════════════════════════════════════════════════════
 // AC-PROFILE-001: Profile visibility
@@ -182,6 +185,43 @@ func TestUpdateProfile_EmptyUsername_Error(t *testing.T) {
 
 	_, err := svc.UpdateProfile(context.Background(), uuid.New(), input)
 	assert.ErrorIs(t, err, user.ErrEmptyUsername)
+}
+
+// ════════════════════════════════════════════════════════════
+// AC-I18N-001: language preference (FR-I18N-001)
+// ════════════════════════════════════════════════════════════
+
+func TestUpdateLanguagePreference_ValidVI(t *testing.T) {
+	repo := &mockRepo{}
+	svc := user.NewService(repo)
+
+	userID := uuid.New()
+	repo.On("UpdateLanguagePreference", mock.Anything, userID, "vi").Return(nil)
+
+	err := svc.UpdateLanguagePreference(context.Background(), userID, "vi")
+	assert.NoError(t, err)
+	repo.AssertExpectations(t)
+}
+
+func TestUpdateLanguagePreference_ValidEN(t *testing.T) {
+	repo := &mockRepo{}
+	svc := user.NewService(repo)
+
+	userID := uuid.New()
+	repo.On("UpdateLanguagePreference", mock.Anything, userID, "en").Return(nil)
+
+	err := svc.UpdateLanguagePreference(context.Background(), userID, "en")
+	assert.NoError(t, err)
+	repo.AssertExpectations(t)
+}
+
+func TestUpdateLanguagePreference_InvalidLang_ReturnsError(t *testing.T) {
+	repo := &mockRepo{}
+	svc := user.NewService(repo)
+
+	err := svc.UpdateLanguagePreference(context.Background(), uuid.New(), "fr")
+	assert.ErrorIs(t, err, user.ErrInvalidLanguage)
+	repo.AssertNotCalled(t, "UpdateLanguagePreference", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // helpers

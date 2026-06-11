@@ -8,6 +8,28 @@ import { blogsApi } from '../api/blogs'
 import { useAuthStore } from '../store/auth'
 import type { Blog } from '../types'
 
+vi.mock('react-i18next', () => ({
+  useTranslation: vi.fn(() => ({
+    t: (key: string) => ({
+      'blog.postNotFound': 'Post not found.',
+      'blog.commentsLabel': 'Comments',
+      'blog.commentPlaceholder': 'Add a comment…',
+      'blog.post': 'Post',
+      'blog.delete': 'Delete',
+      'blog.deleteConfirm': 'Delete this post?',
+      'blog.edit': 'Edit',
+      'blog.copyLink': 'Copy link',
+      'blog.minRead': 'min read',
+      'blog.translationUnavailable': 'Translation unavailable',
+      'blog.translationNotice': 'Showing original Vietnamese content.',
+    } as Record<string, string>)[key] ?? key,
+    i18n: { changeLanguage: vi.fn(), language: 'vi' },
+  })),
+  initReactI18next: { type: '3rdParty', init: vi.fn() },
+}))
+
+import { useTranslation } from 'react-i18next'
+
 vi.mock('../api/blogs', () => ({
   blogsApi: {
     getBlog: vi.fn(),
@@ -146,5 +168,67 @@ describe('BlogDetail page', () => {
     } as never)
     wrap()
     await waitFor(() => expect(screen.getByRole('img', { name: 'Test Post' })).toHaveAttribute('src', 'http://cdn/thumb.jpg'))
+  })
+})
+
+// ════════════════════════════════════════════════════════════
+// BlogDetail — i18n language switching
+// ════════════════════════════════════════════════════════════
+
+describe('BlogDetail — language switching', () => {
+  const i18nBlog: Blog = {
+    ...blog,
+    title_en: 'Test Post in English',
+    body_en: '<p>English full content</p>',
+    translation_status: 'done',
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(useAuthStore).mockReturnValue({ user: null } as never)
+    vi.mocked(blogsApi.getBlog).mockResolvedValue({ data: i18nBlog } as never)
+    vi.mocked(blogsApi.getComments).mockResolvedValue({ data: { items: [], total: 0 } } as never)
+    vi.mocked(useTranslation).mockReturnValue({
+      t: (key: string) => ({ 'blog.postNotFound': 'Post not found.', 'blog.translationUnavailable': 'Translation unavailable', 'blog.translationNotice': 'Showing original Vietnamese content.' } as Record<string, string>)[key] ?? key,
+      i18n: { changeLanguage: vi.fn(), language: 'vi' },
+    } as never)
+  })
+
+  it('shows EN title when language is en and translation_status is done', async () => {
+    vi.mocked(useTranslation).mockReturnValue({
+      t: (key: string) => key,
+      i18n: { changeLanguage: vi.fn(), language: 'en' },
+    } as never)
+    wrap()
+    await waitFor(() =>
+      expect(screen.getByTestId('blog-title')).toHaveTextContent('Test Post in English')
+    )
+  })
+
+  it('shows VI title when language is vi even if EN translation exists', async () => {
+    wrap()
+    await waitFor(() =>
+      expect(screen.getByTestId('blog-title')).toHaveTextContent('Test Post')
+    )
+  })
+
+  it('shows translation-notice when language is en and status is not done', async () => {
+    vi.mocked(useTranslation).mockReturnValue({
+      t: (key: string) => key,
+      i18n: { changeLanguage: vi.fn(), language: 'en' },
+    } as never)
+    vi.mocked(blogsApi.getBlog).mockResolvedValue({
+      data: { ...blog, translation_status: 'none' },
+    } as never)
+    wrap()
+    await waitFor(() =>
+      expect(screen.getByTestId('translation-notice')).toBeInTheDocument()
+    )
+  })
+
+  it('does NOT show translation-notice when language is vi', async () => {
+    wrap()
+    await waitFor(() => screen.getByTestId('blog-title'))
+    expect(screen.queryByTestId('translation-notice')).not.toBeInTheDocument()
   })
 })

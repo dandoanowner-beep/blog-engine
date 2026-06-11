@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import type { BlogCard as BlogCardType } from '../types'
 
 interface Props {
@@ -6,6 +7,10 @@ interface Props {
 }
 
 export default function BlogCard({ blog }: Props) {
+  const { t, i18n } = useTranslation()
+  const showEN = i18n.language === 'en' && blog.translation_status === 'done'
+  const displayTitle = showEN && blog.title_en ? blog.title_en : blog.title
+
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow" data-testid="blog-card">
       {blog.thumbnail_url && (
@@ -24,12 +29,12 @@ export default function BlogCard({ blog }: Props) {
             {blog.author.username}
           </Link>
           <span className="text-gray-400 text-xs">·</span>
-          <span className="text-xs text-gray-400">{blog.read_time_min} min read</span>
+          <span className="text-xs text-gray-400">{blog.read_time_min} {t('blog.minRead')}</span>
         </div>
 
         <Link to={`/blog/${blog.id}`}>
           <h2 className="font-semibold text-gray-900 mb-1 line-clamp-2 hover:text-blue-600">
-            {blog.title}
+            {displayTitle}
           </h2>
           <p className="text-gray-500 text-sm line-clamp-2 mb-3">{blog.excerpt}</p>
         </Link>
@@ -47,7 +52,7 @@ export default function BlogCard({ blog }: Props) {
           <span>👎 {blog.dislike_count}</span>
           <span>💬 {blog.comment_count}</span>
           {blog.partial && (
-            <span className="ml-auto text-blue-500 font-medium">Sign in to read more →</span>
+            <span className="ml-auto text-blue-500 font-medium">{t('blog.signInToReadMore')}</span>
           )}
         </div>
       </div>

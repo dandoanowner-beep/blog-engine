@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { blogsApi } from '../api/blogs'
 import { useAuthStore } from '../store/auth'
 import GuestPrompt from '../components/GuestPrompt'
@@ -8,6 +9,7 @@ import GuestPrompt from '../components/GuestPrompt'
 export default function BlogDetail() {
   const { id } = useParams<{ id: string }>()
   const { user } = useAuthStore()
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [comment, setComment] = useState('')
@@ -46,11 +48,16 @@ export default function BlogDetail() {
     return <div className="animate-pulse h-96 bg-gray-100 rounded-lg" />
   }
   if (!blog) {
-    return <div className="text-center py-12 text-gray-500">Post not found.</div>
+    return <div className="text-center py-12 text-gray-500">{t('blog.postNotFound')}</div>
   }
 
   const isAuthor = user?.id === blog.author.id
   const isMod = user && ['moderator', 'admin', 'owner'].includes(user.role)
+
+  const showEN = i18n.language === 'en' && blog.translation_status === 'done'
+  const showTranslationNotice = i18n.language === 'en' && blog.translation_status !== 'done'
+  const displayTitle = showEN && blog.title_en ? blog.title_en : blog.title
+  const displayContent = showEN && blog.body_en ? blog.body_en : blog.content
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -58,21 +65,30 @@ export default function BlogDetail() {
         <img src={blog.thumbnail_url} alt={blog.title} className="w-full h-64 object-cover rounded-lg mb-6" />
       )}
 
-      <h1 className="text-3xl font-bold mb-3" data-testid="blog-title">{blog.title}</h1>
+      <h1 className="text-3xl font-bold mb-3" data-testid="blog-title">{displayTitle}</h1>
+
+      {showTranslationNotice && (
+        <div
+          data-testid="translation-notice"
+          className="mb-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2"
+        >
+          {t('blog.translationUnavailable')} — {t('blog.translationNotice')}
+        </div>
+      )}
 
       <div className="flex items-center gap-3 text-sm text-gray-500 mb-6">
         <Link to={`/profile/${blog.author.username}`} className="font-medium text-gray-700 hover:text-blue-600">
           {blog.author.username}
         </Link>
         <span>·</span>
-        <span>{blog.read_time_min} min read</span>
+        <span>{blog.read_time_min} {t('blog.minRead')}</span>
         <span>·</span>
         <span>{new Date(blog.published_at).toLocaleDateString()}</span>
       </div>
 
       <div
         className="prose max-w-none mb-8"
-        dangerouslySetInnerHTML={{ __html: blog.content }}
+        dangerouslySetInnerHTML={{ __html: displayContent }}
         data-testid="blog-content"
       />
 
@@ -99,26 +115,26 @@ export default function BlogDetail() {
               Facebook
             </button>
             <button onClick={() => blogsApi.copyLink(blog.id)} className="text-sm text-gray-400 hover:text-gray-700">
-              Copy link
+              {t('blog.copyLink')}
             </button>
             {(isAuthor || isMod) && (
               <button
-                onClick={() => { if (confirm('Delete this post?')) deleteMutation.mutate() }}
+                onClick={() => { if (confirm(t('blog.deleteConfirm'))) deleteMutation.mutate() }}
                 className="ml-auto text-sm text-red-400 hover:text-red-600"
                 data-testid="delete-btn"
               >
-                Delete
+                {t('blog.delete')}
               </button>
             )}
             {isAuthor && (
               <Link to={`/editor/${blog.id}`} className="text-sm text-gray-400 hover:text-gray-700">
-                Edit
+                {t('blog.edit')}
               </Link>
             )}
           </div>
 
           <div className="border-t pt-6">
-            <h3 className="font-semibold mb-4">Comments ({commentsData?.items?.length ?? 0})</h3>
+            <h3 className="font-semibold mb-4">{t('blog.commentsLabel')} ({commentsData?.items?.length ?? 0})</h3>
             <form
               onSubmit={(e) => { e.preventDefault(); commentMutation.mutate(comment) }}
               className="flex gap-2 mb-6"
@@ -126,7 +142,7 @@ export default function BlogDetail() {
               <input
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
-                placeholder="Add a comment…"
+                placeholder={t('blog.commentPlaceholder')}
                 className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 data-testid="comment-input"
               />
@@ -135,7 +151,7 @@ export default function BlogDetail() {
                 disabled={!comment.trim() || commentMutation.isPending}
                 className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 disabled:opacity-60"
               >
-                Post
+                {t('blog.post')}
               </button>
             </form>
           </div>

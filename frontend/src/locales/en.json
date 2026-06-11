@@ -1,0 +1,28 @@
+{
+  "nav": {
+    "articles": "Articles",
+    "portfolio": "Portfolio",
+    "author": "Author",
+    "categories": "Categories",
+    "forums": "Forums",
+    "write": "Write",
+    "signIn": "Sign in",
+    "getStarted": "Get started",
+    "logout": "Logout",
+    "admin": "Admin"
+  },
+  "blog": {
+    "minRead": "min read",
+    "signInToReadMore": "Sign in to read more →",
+    "postNotFound": "Post not found.",
+    "copyLink": "Copy link",
+    "delete": "Delete",
+    "deleteConfirm": "Delete this post?",
+    "edit": "Edit",
+    "commentsLabel": "Comments",
+    "commentPlaceholder": "Add a comment…",
+    "post": "Post",
+    "translationUnavailable": "Translation unavailable",
+    "translationNotice": "Showing original Vietnamese content."
+  }
+}

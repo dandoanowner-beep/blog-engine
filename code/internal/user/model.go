@@ -7,9 +7,10 @@ import (
 )
 
 var (
-	ErrNotFound     = errors.New("user not found")
-	ErrUsernameTaken = errors.New("username already taken")
-	ErrEmptyUsername = errors.New("username cannot be empty")
+	ErrNotFound        = errors.New("user not found")
+	ErrUsernameTaken   = errors.New("username already taken")
+	ErrEmptyUsername   = errors.New("username cannot be empty")
+	ErrInvalidLanguage = errors.New("language must be 'vi' or 'en'")
 )
 
 type Visibility string

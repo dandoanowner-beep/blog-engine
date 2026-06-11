@@ -65,7 +65,7 @@ describe('Login page', () => {
   })
 
   it('shows error message on failed login', async () => {
-    mockLogin.mockRejectedValue(new Error('invalid'))
+    mockLogin.mockRejectedValue({ response: { status: 401, data: { error: 'Invalid email or password' } } })
     renderLogin()
 
     await userEvent.type(screen.getByLabelText('Email'), 'a@b.com')

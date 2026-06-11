@@ -67,6 +67,8 @@ jobs:
           R2_SECRET_ACCESS_KEY: test
           R2_BUCKET_NAME: test
           R2_PUBLIC_URL: https://test.r2.dev
+          # Leave blank — translation gracefully degrades; no real API key needed for unit tests
+          ANTHROPIC_API_KEY: ""
 
       - name: Check coverage gate (80% business-logic minimum)
         working-directory: ./code
@@ -145,6 +147,7 @@ jobs:
         env:
           TF_VAR_db_url: ${{ secrets.DATABASE_URL }}
           TF_VAR_image_tag: sprint1-${{ github.sha }}
+          TF_VAR_anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
 
       - name: Terraform Apply
         working-directory: ./iac
@@ -152,6 +155,7 @@ jobs:
         env:
           TF_VAR_db_url: ${{ secrets.DATABASE_URL }}
           TF_VAR_image_tag: sprint1-${{ github.sha }}
+          TF_VAR_anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
 
       - name: Run database migrations
         run: |
@@ -294,6 +298,7 @@ jobs:
           TF_VAR_image_tag: sprint1-${{ github.sha }}
           TF_VAR_frontend_image_tag: frontend-${{ github.sha }}
           TF_VAR_api_base_url: ${{ secrets.API_BASE_URL }}
+          TF_VAR_anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
 
       - name: Terraform Apply (frontend extension)
         working-directory: ./iac
@@ -303,6 +308,7 @@ jobs:
           TF_VAR_image_tag: sprint1-${{ github.sha }}
           TF_VAR_frontend_image_tag: frontend-${{ github.sha }}
           TF_VAR_api_base_url: ${{ secrets.API_BASE_URL }}
+          TF_VAR_anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
 
       - name: Frontend health check
         run: |

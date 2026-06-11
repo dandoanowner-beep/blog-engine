@@ -128,6 +128,15 @@ variable "image_repo" {
   default     = "your-org/blog-engine/blog-engine-api"
 }
 
+# ── i18n variables (added: i18n-backend sprint) ──────────────────────────────
+
+variable "anthropic_api_key" {
+  description = "Anthropic API key for VI→EN blog translation (optional — leave blank to disable)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 # ── Frontend variables (added: frontend sprint) ───────────────────────────────
 
 variable "frontend_image_tag" {
@@ -184,6 +193,7 @@ resource "docker_container" "api" {
     "SMTP_PASS=${var.smtp_pass}",
     "APP_URL=${var.app_url}",
     "PORT=${var.port}",
+    "ANTHROPIC_API_KEY=${var.anthropic_api_key}",
   ]
 
   healthcheck {

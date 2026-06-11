@@ -88,6 +88,82 @@ func TestUpdateProfileHandler_Success(t *testing.T) {
 	assert.NotNil(t, resp["user"])
 }
 
+// ════════════════════════════════════════════════════════════
+// PUT /users/me/language — AC-I18N-001
+// ════════════════════════════════════════════════════════════
+
+func TestUpdateLanguagePrefHandler_Returns200(t *testing.T) {
+	repo := &mockRepo{}
+	svc := user.NewService(repo)
+	h := user.NewHandler(svc)
+
+	userID := uuid.New()
+	repo.On("UpdateLanguagePreference", mock.Anything, userID, "en").Return(nil)
+
+	r := chi.NewRouter()
+	r.Put("/users/me/language", func(w http.ResponseWriter, req *http.Request) {
+		ctx := context.WithValue(req.Context(), middleware.ContextKey("user_id"), userID)
+		h.UpdateLanguagePreference(w, req.WithContext(ctx))
+	})
+
+	body, _ := json.Marshal(map[string]string{"language": "en"})
+	req := httptest.NewRequest(http.MethodPut, "/users/me/language", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.Equal(t, "en", resp["language"])
+}
+
+func TestUpdateLanguagePrefHandler_InvalidLang_Returns400(t *testing.T) {
+	repo := &mockRepo{}
+	svc := user.NewService(repo)
+	h := user.NewHandler(svc)
+
+	userID := uuid.New()
+	r := chi.NewRouter()
+	r.Put("/users/me/language", func(w http.ResponseWriter, req *http.Request) {
+		ctx := context.WithValue(req.Context(), middleware.ContextKey("user_id"), userID)
+		h.UpdateLanguagePreference(w, req.WithContext(ctx))
+	})
+
+	body, _ := json.Marshal(map[string]string{"language": "fr"})
+	req := httptest.NewRequest(http.MethodPut, "/users/me/language", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotEmpty(t, resp["error"])
+}
+
+func TestUpdateLanguagePrefHandler_InvalidBody_Returns400(t *testing.T) {
+	repo := &mockRepo{}
+	svc := user.NewService(repo)
+	h := user.NewHandler(svc)
+
+	userID := uuid.New()
+	r := chi.NewRouter()
+	r.Put("/users/me/language", func(w http.ResponseWriter, req *http.Request) {
+		ctx := context.WithValue(req.Context(), middleware.ContextKey("user_id"), userID)
+		h.UpdateLanguagePreference(w, req.WithContext(ctx))
+	})
+
+	req := httptest.NewRequest(http.MethodPut, "/users/me/language", bytes.NewBufferString("not-json"))
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NotEmpty(t, resp["error"])
+}
+
 func TestUpdateProfileHandler_DuplicateUsername_Returns409(t *testing.T) {
 	repo := &mockRepo{}
 	svc := user.NewService(repo)

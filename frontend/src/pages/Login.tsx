@@ -16,8 +16,18 @@ export default function Login() {
     try {
       await login(email, password)
       navigate('/')
-    } catch {
-      setError('Invalid email or password')
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+      if (status === 423) {
+        setError('Account locked — too many failed attempts. Please try again in 15 minutes.')
+      } else if (status === 401 || status === 400) {
+        setError(msg ?? 'Invalid email or password')
+      } else if (status === undefined) {
+        setError('Unable to connect. Please check your connection.')
+      } else {
+        setError(msg ?? 'Something went wrong. Please try again.')
+      }
     }
   }
 
